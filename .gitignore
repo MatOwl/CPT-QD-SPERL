@@ -1,6 +1,11 @@
 __pycache__/
 *.pyc
 *.pyo
+.ipynb_checkpoints/
+
+# Vendored / reference material outside git's concern
+/paperRef
+/CumSPERL_ref
 
 # Persisted runs from run_paper_eval.py / benchmark.py
 results/

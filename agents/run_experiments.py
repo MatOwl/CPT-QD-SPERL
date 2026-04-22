@@ -57,6 +57,12 @@ def main():
     parser.add_argument("--eval-freq", type=int, default=100)
     parser.add_argument("--support-size", type=int, default=50)
     parser.add_argument("--critic-lr", type=float, default=0.1)
+    parser.add_argument("--critic-clip", type=float, nargs=2, default=None,
+                        metavar=("LO", "HI"),
+                        help="[sperl] optional legacy lbub filter: clip "
+                             "quantile rows to [LO, HI] after each update. "
+                             "Useful on envs where known reward bounds exist "
+                             "and default lr/param_init lets quantiles run away.")
     parser.add_argument("--target", choices=["TD", "MC"], default="TD")
     parser.add_argument("--order", choices=["fwd", "bwd"], default="bwd")
 
@@ -107,6 +113,13 @@ def main():
     cpt = CPTParams(args.alpha, args.rho1, args.rho2, args.lmbd)
 
     if args.algo == "sperl":
+        # NOTE: QRCritic uses env-sensitive tricks (first-visit mean init,
+        # MC targets that collapse all quantiles to a scalar, etc.; see
+        # QRCritic docstring). The defaults --critic-lr=0.1,
+        # --support-size=50 are tuned for Barberis (rewards O(10)).
+        # OptEx rewards are ~1e-3..1e-2 — if convergence looks weak,
+        # retune critic-lr (try 0.01) and/or param_init before blaming the
+        # algorithm. The legacy CumSPERL lbub-filter is not yet ported.
         exploration = {"type": "eps-greedy", "params": [args.eps]}
         agent = GreedySPERL(
             env, featurizer, cpt,
@@ -116,6 +129,7 @@ def main():
             target_type=args.target,
             order=args.order,
             seed=args.seed,
+            critic_clip_bounds=tuple(args.critic_clip) if args.critic_clip else None,
         )
         print(f"[config] env={args.env} algo=sperl "
               f"n_states={featurizer.n_states} nA={env.action_space.n} "

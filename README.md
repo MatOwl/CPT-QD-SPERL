@@ -57,6 +57,22 @@ is required.
 Both algorithms share `CPTParams` (α, ρ₁, ρ₂, λ) and a tabular featurizer
 that returns a flat index + hashable key.
 
+### Env-sensitive tricks in the QR critic
+
+The quantile learner in `QRCritic` is **not pure quantile regression**; it
+bakes in a few heuristics that are tuned for Barberis-scale rewards and
+should be revisited when porting to a new env. See the `QRCritic` docstring
+for the full list. In particular:
+
+- first-visit mean initialisation couples the critic to the reward scale;
+- MC targets collapse all quantiles to the scalar return-to-go (point
+  estimate, not distributional);
+- the legacy CumSPERL lbub-filter is available as an opt-in via
+  `--critic-clip LO HI` but is **off by default**;
+- default `--critic-lr 0.1` / `--support-size 50` assume Barberis-scale
+  rewards (O(10)); OptEx rewards are ~100× smaller — retune before
+  blaming the algorithm.
+
 ## Quick start
 
 ```bash

@@ -38,15 +38,50 @@ class QRCritic:
 
     ``qtile_theta[loc, a, i]`` holds the i-th quantile of return under taking
     action ``a`` at the state indexed by ``loc``.
+
+    ------------------------------------------------------------------
+    Env-sensitive tricks (not pure QR — may need retuning per env!)
+    ------------------------------------------------------------------
+    1. **First-visit mean init** (``update``): all I quantiles are overwritten
+       with the batch mean on first visit to (loc, a). Warm-starts away from
+       ``param_init`` but couples the critic to the reward scale — on envs
+       with O(1) rewards vs O(1e-2) rewards (Barberis vs OptEx) the same
+       ``lr`` behaves very differently.
+    2. **MC targets collapse all quantiles to the scalar return-to-go**
+       (see ``GreedySPERL._train_critic_MC``). That's point-estimate
+       regression wearing a QR coat — distributional info is lost. TD is
+       the "real" QR path; MC is mainly an init baseline.
+    3. **Terminal-step targets collapse to the realised reward** (TD path).
+       Fine when terminal value is deterministic; revisit if you add a
+       stochastic terminal reward.
+    4. **Greedy-SPERL opponent uses deterministic argmax** on the learned
+       policy when bootstrapping (``_train_critic_TD``). Correct for SPE
+       induction, wrong for precommitment critics.
+
+    Legacy tricks from the reference CumSPERL code that are **not** ported
+    here (may matter for OptEx convergence):
+      - lower/upper bound (lbub) filtering on quantile updates;
+      - a more aggressive first-visit scheme.
+
+    If you change the env, start by inspecting reward scale vs ``lr`` and
+    ``param_init``, and consider whether MC targets are good enough or you
+    need real per-quantile samples.
     """
 
     def __init__(self, featurizer, n_actions, support_size=50, lr=0.1,
-                 param_init=0.0, cpt_params: CPTParams | None = None):
+                 param_init=0.0, cpt_params: CPTParams | None = None,
+                 clip_bounds: tuple[float, float] | None = None):
+        """``clip_bounds=(lo, hi)`` enables the legacy CumSPERL lbub filter:
+        after each per-slice update the quantile row is clipped to
+        ``[lo, hi]``. Leave ``None`` for pure QR (current default). Useful
+        when porting an env with known reward bounds and the default
+        ``lr``/``param_init`` produces runaway quantiles."""
         self.featurizer = featurizer
         self.n_actions = n_actions
         self.I = support_size
         self.lr = lr
         self.cpt_params = cpt_params or CPTParams()
+        self.clip_bounds = clip_bounds
 
         shape = (featurizer.n_states, n_actions, support_size)
         self.qtile_theta = np.full(shape, param_init, dtype=np.float64)
@@ -106,6 +141,10 @@ class QRCritic:
             # In-place per-slice update
             current += self.lr * grad_slice
 
+            if self.clip_bounds is not None:
+                np.clip(current, self.clip_bounds[0], self.clip_bounds[1],
+                        out=current)
+
 
 class GreedyPolicy:
     """Greedy policy driven directly by the critic's CPT-over-quantiles."""
@@ -161,7 +200,8 @@ class GreedySPERL:
     def __init__(self, env, featurizer, cpt_params: CPTParams,
                  support_size=50, critic_lr=0.1,
                  exploration=None, target_type="TD", order="bwd",
-                 discount=1.0, seed=None, empty_memory=True):
+                 discount=1.0, seed=None, empty_memory=True,
+                 critic_clip_bounds: tuple[float, float] | None = None):
         self.env = env
         self.featurizer = featurizer
         self.horizon = getattr(env, "horizon", None) or env.T
@@ -177,6 +217,7 @@ class GreedySPERL:
         self.critic = QRCritic(
             featurizer, env.action_space.n,
             support_size=support_size, lr=critic_lr, cpt_params=cpt_params,
+            clip_bounds=critic_clip_bounds,
         )
         self.policy = GreedyPolicy(
             featurizer, env.action_space.n, exploration=exploration,
