@@ -55,7 +55,8 @@ class barberisCasino(gym.Env):
         Important: the observation must be a numpy array
         :return: (np.array) 
         """
-        super().seed(seed) # Alt: reset(seed = seed) --> ERROR NO ARGS SEED
+        if seed is not None and hasattr(super(), "seed"):
+            super().seed(seed) # Alt: reset(seed = seed) --> ERROR NO ARGS SEED
         
         # @gym.Env <- super()
         # from gym.utils import seeding
