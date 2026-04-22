@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# Persisted runs from run_paper_eval.py / benchmark.py
+results/
+
+# Local profile dumps
+*.prof
+
+# IDE / OS junk
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+/.claude
+/CumSPERL_ref
+/paperRef
+/.ipynb_checkpoints
