@@ -48,7 +48,7 @@ def compute_spe_policy(env, cpt_params: CPTParams, n_eval_eps=500, rng=None):
                         if done:
                             break
                         action = follow(nxt)
-                    rewards.append(total)
+                    rewards.append(total + z)
                 q_vals.append(cpt_params.compute(rewards))
             policy[(t, z)] = int(np.argmax(q_vals))
 

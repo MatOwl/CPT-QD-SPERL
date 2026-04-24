@@ -33,6 +33,7 @@ def rollout_cpt_from_state(
     n_eps: int,
     cpt_params: CPTParams,
     reset_kwargs_for_state: Callable | None = None,
+    initial_offset_for_state: Callable | None = None,
 ):
     """Run ``n_eps`` episodes starting from ``init_state`` under ``policy_fn``
     and return the CPT of total rewards.
@@ -41,8 +42,17 @@ def rollout_cpt_from_state(
     ``reset_kwargs_for_state(init_state) -> dict`` produces the kwargs that
     ``env.reset`` needs to land at ``init_state`` (Barberis and OptEx differ in
     reset signature).
+    ``initial_offset_for_state(init_state) -> float`` adds an env-specific
+    offset to each trajectory's summed reward before CPT evaluation. Required
+    when the MDP reward is an *increment* relative to the state's embedded
+    position (Barberis: wealth z), so that CPT is computed on terminal wealth
+    (z + Σr) rather than on the change from z.  Defaults to 0 for envs whose
+    Σr is already the CPT-relevant quantity (e.g. OptEx revenue).
     """
     rewards = []
+    offset = 0.0
+    if initial_offset_for_state is not None:
+        offset = float(initial_offset_for_state(init_state))
     for _ in range(n_eps):
         if reset_kwargs_for_state is not None:
             state = env.reset(**reset_kwargs_for_state(init_state))
@@ -57,7 +67,7 @@ def rollout_cpt_from_state(
             t += 1
             if done:
                 break
-        rewards.append(total)
+        rewards.append(total + offset)
     return cpt_params.compute(list(rewards))
 
 
@@ -92,6 +102,20 @@ def reset_kwargs_builder(env):
     return optex_reset_kwargs
 
 
+def barberis_initial_offset(init_state):
+    """Barberis: terminal wealth = z + Σr, so CPT must be evaluated on z+Σr."""
+    _, z = init_state
+    return float(z)
+
+
+def initial_offset_builder(env):
+    """Return the env-specific initial-offset function (None for envs where
+    the MDP reward's running sum is already the CPT-relevant quantity)."""
+    if hasattr(env, "bet") and hasattr(env, "T"):
+        return barberis_initial_offset
+    return None
+
+
 # ------------------ policy helpers ------------------
 
 def learned_policy_fn(agent):
@@ -114,6 +138,7 @@ def compute_paper_metrics(
     n_eps_per_state: int = 200,
     states: Iterable | None = None,
     reset_kwargs_for_state: Callable | None = None,
+    initial_offset_for_state: Callable | None = None,
 ):
     """Compute the 4 paper metrics for a single seed/run.
 
@@ -136,6 +161,9 @@ def compute_paper_metrics(
     if reset_kwargs_for_state is None:
         reset_kwargs_for_state = reset_kwargs_builder(env)
 
+    if initial_offset_for_state is None:
+        initial_offset_for_state = initial_offset_builder(env)
+
     per_state = []
     v_tilde_total = 0.0
     v_hat_total = 0.0
@@ -152,10 +180,12 @@ def compute_paper_metrics(
         a_hat = int(reference_pi(_state_time(x, env), _to_obs(x, env)))
 
         v_tilde = rollout_cpt_from_state(
-            env, learned_pi, x, n_eps_per_state, cpt_params, reset_kwargs_for_state
+            env, learned_pi, x, n_eps_per_state, cpt_params,
+            reset_kwargs_for_state, initial_offset_for_state,
         )
         v_hat = rollout_cpt_from_state(
-            env, reference_pi, x, n_eps_per_state, cpt_params, reset_kwargs_for_state
+            env, reference_pi, x, n_eps_per_state, cpt_params,
+            reset_kwargs_for_state, initial_offset_for_state,
         )
 
         per_state.append({

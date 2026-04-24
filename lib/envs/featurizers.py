@@ -23,6 +23,16 @@ class Featurizer:
     def key(self, obs):
         raise NotImplementedError
 
+    def cpt_offset(self, obs) -> float:
+        """Additive constant to shift critic quantiles by before CPT evaluation.
+
+        Needed when the env's step reward is an increment relative to an
+        embedded state coordinate (Barberis: wealth z) but the CPT reference is
+        at the game's start (0). Default 0 — envs whose Σr is already the
+        CPT-relevant quantity leave this untouched.
+        """
+        return 0.0
+
 
 class BarberisFeaturizer(Featurizer):
     """Barberis casino: obs = (t, z), z \\in {-T*bet, ..., T*bet}."""
@@ -41,6 +51,11 @@ class BarberisFeaturizer(Featurizer):
     def key(self, obs):
         t, z = obs
         return (int(t), int(z))
+
+    def cpt_offset(self, obs) -> float:
+        """Barberis: CPT is on terminal wealth = z + Σr, so offset = z."""
+        _, z = obs
+        return float(z)
 
     def iter_states(self):
         """Enumerate reachable (t, z) states. z must lie in the support

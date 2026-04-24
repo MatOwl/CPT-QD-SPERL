@@ -87,6 +87,20 @@ def main():
     parser.add_argument("--eps", type=float, default=0.1,
                         help="[sperl] eps-greedy exploration rate")
 
+    # paper Alg 3 (consistent tie-break) + Alg 4 (quantile filter) for SPERL
+    parser.add_argument("--sticky-policy", action="store_true",
+                        help="[sperl] Alg 3: only update policy when new"
+                             " argmax strictly beats old at a state.")
+    parser.add_argument("--tie-thresh", type=float, default=0.0,
+                        help="[sperl] Randomize tie-break within tie-thresh"
+                             " of max CPT. Default 0 = exact ties only.")
+    parser.add_argument("--filter-thresh", type=float, default=None,
+                        help="[sperl] Alg 4: gap-quantile threshold. None = off.")
+    parser.add_argument("--filter-accept-ratio", type=float,
+                        default=float("inf"),
+                        help="[sperl] Alg 4: max rel. CPT deviation to accept"
+                             " filtered quantiles. inf = trust filter.")
+
     # SPSA hyperparams
     parser.add_argument("--spsa-step", type=float, default=5.0,
                         help="[spsa] base step size a_0")
@@ -130,6 +144,10 @@ def main():
             order=args.order,
             seed=args.seed,
             critic_clip_bounds=tuple(args.critic_clip) if args.critic_clip else None,
+            sticky_policy=args.sticky_policy,
+            tie_thresh=args.tie_thresh,
+            filter_thresh=args.filter_thresh,
+            filter_accept_ratio=args.filter_accept_ratio,
         )
         print(f"[config] env={args.env} algo=sperl "
               f"n_states={featurizer.n_states} nA={env.action_space.n} "

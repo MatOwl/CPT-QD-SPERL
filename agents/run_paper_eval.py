@@ -114,6 +114,24 @@ def main():
     parser.add_argument("--spe-file", type=str, default=None,
                         help="path to SPE_OptEx_*.npy (optex only)")
 
+    # paper Alg 3 — consistent tie-break / is-better guard
+    parser.add_argument("--sticky-policy", action="store_true",
+                        help="Alg 3: only update policy when new argmax"
+                             " strictly beats old at this state (paper §C.2).")
+    parser.add_argument("--tie-thresh", type=float, default=0.0,
+                        help="Randomize tie-break within tie-thresh of max"
+                             " CPT. Default 0 = exact ties only.")
+
+    # paper Alg 4 — quantile filter
+    parser.add_argument("--filter-thresh", type=float, default=None,
+                        help="Alg 4: gap-quantile threshold (filterTresh),"
+                             " e.g. 0.75. None disables filtering.")
+    parser.add_argument("--filter-accept-ratio", type=float,
+                        default=float("inf"),
+                        help="Alg 4: max relative CPT deviation to accept"
+                             " filtered quantiles (treshRatio). Default inf"
+                             " = trust filter unconditionally.")
+
     # persistence
     parser.add_argument("--results-dir", type=str, default="./results",
                         help="root directory for saved artifacts")
@@ -147,6 +165,10 @@ def main():
             support_size=args.support_size, critic_lr=args.critic_lr,
             exploration={"type": "eps-greedy", "params": [args.eps]},
             target_type="TD", order="bwd", seed=seed,
+            sticky_policy=args.sticky_policy,
+            tie_thresh=args.tie_thresh,
+            filter_thresh=args.filter_thresh,
+            filter_accept_ratio=args.filter_accept_ratio,
         )
         agent.learn(
             n_train_eps=args.train_eps, n_batch=args.batch,
