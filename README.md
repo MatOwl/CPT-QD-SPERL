@@ -34,6 +34,9 @@ agents/
 
 scripts/
   benchmark.py            # train + paper-eval wall-time + optional cProfile
+  analyze_optex.py        # per-state SPERL-vs-SPE breakdown + visit-frequency
+  sw_breakdown.py         # social-welfare sum under different state-filter defs
+  visit_freq_check.py     # standalone OptEx SPE-rollout visit counter
 ```
 
 ## Environments
@@ -76,8 +79,7 @@ for the full list. In particular:
 ## Quick start
 
 ```bash
-# Activate the virtualenv at C:\Users\User\rl (Python 3.10)
-PYTHON=C:/Users/User/rl/Scripts/python.exe
+PYTHON="C:/Users/Jingxiang Tang/FNN/Scripts/python.exe"   # adjust to your venv
 
 # Train Greedy-SPERL on Barberis, compare with analytical SPE oracle
 $PYTHON agents/run_experiments.py --env barberis --algo sperl \
@@ -87,12 +89,12 @@ $PYTHON agents/run_experiments.py --env barberis --algo sperl \
 $PYTHON agents/run_experiments.py --env optex --algo sperl \
     --sigma 0.015 --num-w 4 --horizon 5 \
     --train-eps 500 --batch 20 --support-size 20 \
-    --spe-file ../CumSPERL_ref/SPE_OptEx_5_0.015_4.npy
+    --spe-file CumSPERL_ref/SPE_OptEx_5_0.015_4.npy
 
 # Train SPSA baseline (precommitment) on OptEx
 $PYTHON agents/run_experiments.py --env optex --algo spsa \
     --sigma 0.015 --seed 2 --train-eps 1000 --batch 50 \
-    --spe-file ../CumSPERL_ref/SPE_OptEx_5_0.015_4.npy
+    --spe-file CumSPERL_ref/SPE_OptEx_5_0.015_4.npy
 ```
 
 ## Paper-style evaluation
@@ -102,20 +104,55 @@ Reproduces the four metrics from MSci_MANUSCRIPT §4.1–4.2:
 - **Policy Error**    `Σ_x |π̃(x) − π̂(x)|`
 - **Value Error**     `Σ_x |V^π̃(x) − V^π̂(x)|`
 - **Optimality**      `V^π̃(x₀)`
-- **Social Welfare**  `Σ_x V^π̃(x)`
+- **Social Welfare**  `Σ_x V^π̃(x)` (paper Definition 5)
 
-Aggregated as `(mean, stdev)` across seeds.
+Aggregated as `(mean, stdev)` across seeds. The summation domain `X` is the
+**reachable, non-terminal decision states** (BFS tree for OptEx; parity-correct
+`(t, z)` with `t<T` for Barberis), matching paper's convention.
 
 ```bash
 # Barberis: SPE oracle solved in-process via backward induction
-$PYTHON agents/run_paper_eval.py --env barberis --p-win 0.72 --seeds 3 \
-    --train-eps 2000 --eval-per-state 80 --spe-rollouts 200
+$PYTHON agents/run_paper_eval.py --env barberis --p-win 0.72 \
+    --alpha 0.88 --rho1 0.65 --rho2 0.65 --lmbd 2.25 \
+    --train-eps 15000 --batch 1 --support-size 50 \
+    --critic-lr 0.04 --eps 0.3 --seeds 3 --spe-rollouts 2000
 
 # OptEx: SPE oracle loaded from .npy
-$PYTHON agents/run_paper_eval.py --env optex --sigma 0.015 --seeds 3 \
-    --train-eps 500 --eval-per-state 30 \
-    --spe-file ../CumSPERL_ref/SPE_OptEx_5_0.015_4.npy
+$PYTHON agents/run_paper_eval.py --env optex --sigma 0.015 --num-w 4 \
+    --horizon 5 --train-eps 3000 --batch 20 --support-size 20 \
+    --critic-lr 0.1 --eps 0.3 --seeds 3 --eval-per-state 30 \
+    --spe-file CumSPERL_ref/SPE_OptEx_5_0.015_4.npy
 ```
+
+### Algorithm 3 / 4 — sticky greedy + quantile filter (paper Appendix C.2.2)
+
+Off by default for backwards compatibility; opt in via:
+
+| flag | default | meaning |
+|---|---|---|
+| `--sticky-policy` | off | Alg 3 "is-better" guard: only flip greedy action if new CPT strictly exceeds previous policy's CPT (avoids flat-landscape argmax churn) |
+| `--tie-thresh FLOAT` | 0.0 | random uniform tie-break within ±tie-thresh of max CPT (requires `--sticky-policy`) |
+| `--filter-thresh FLOAT` | None (off) | Alg 4 quantile filter `filterTresh` — snaps quantiles whose neighbour-gap exceeds the `filter-thresh`-quantile |
+| `--filter-accept-ratio FLOAT` | inf | Alg 4 `treshRatio` — fall back to unfiltered CPT if `|filtered - unfiltered| / |unfiltered| > ratio`; `inf` always trusts filter |
+
+Available on both `agents/run_paper_eval.py` and `agents/run_experiments.py`.
+
+### Per-run analysis
+
+```bash
+# OptEx: per-state SPERL-vs-SPE breakdown + SPE visit-frequency cross-tab
+$PYTHON scripts/analyze_optex.py results/optex_sperl_sig0.015_numw4_cpt_a0.95_r0.5_l1.5
+
+# Pass --no-visit to skip the visit-frequency rollout (saves ~10s)
+# Pass --n-traj N to change the number of SPE trajectories (default 2000)
+
+# Compare SW under different state-filter definitions (Barberis only)
+$PYTHON scripts/sw_breakdown.py
+```
+
+`analyze_optex.py` writes `disagree_heatmap.png` (P(disagree) over `(t, log-bin)`)
+and `visit_freq_breakdown.csv` (per-node category × SPE visit count) into the
+run directory.
 
 ## Notes on reproducing the paper
 
@@ -172,5 +209,10 @@ Remaining known costs:
 
 ## Dependencies
 
-`gym`, `numpy`, `scipy`, `pandas`, `matplotlib`, `pypdf` (paper parsing only),
+`gym==0.26.2`, `numpy<2` (gym 0.26 hard requirement — `numpy==1.26.3` works),
+`scipy`, `pandas`, `matplotlib`, `pypdf` (paper parsing only),
 `stable-baselines` (legacy scripts only — for `set_global_seeds`).
+
+> **stderr noise**: `gym 0.26` emits numpy 2.x deprecation warnings even on
+> numpy 1.26. Filter with
+> `2>&1 | grep -v "Gym has\|Please upgrade\|Users of this\|See the migration"`.

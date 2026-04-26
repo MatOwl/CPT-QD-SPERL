@@ -25,3 +25,13 @@ Thumbs.db
 /results_optex
 /results_postfix
 /results_postfix_v2
+/results_swfix/barberis_sperl_p0.72_cpt_a0.88_r0.65_l2.25
+/results_cpt88_p066_baseline/barberis_sperl_p0.66_cpt_a0.88_r0.65_l2.25
+/results_cpt88_p066_alg34_strict/barberis_sperl_p0.66_cpt_a0.88_r0.65_l2.25
+/results_cpt88_p066_alg34/barberis_sperl_p0.66_cpt_a0.88_r0.65_l2.25
+/results_alg34_stickyonly/barberis_sperl_p0.72_cpt_a0.88_r0.65_l2.25
+/results_alg34_optex_stickyonly
+/results_alg34_optex/optex_sperl_sig0.015_numw4_cpt_a0.95_r0.5_l1.5
+/results_alg34_off
+/results_alg34_filteronly
+/results_alg34

@@ -58,10 +58,15 @@ class BarberisFeaturizer(Featurizer):
         return float(z)
 
     def iter_states(self):
-        """Enumerate reachable (t, z) states. z must lie in the support
-        {-t*bet, ..., -bet, 0, bet, ..., t*bet} at each t."""
-        for t in range(self.n_t):
-            for k in range(-t, t + 1):
+        """Enumerate decision states reachable from x_0=(0,0).
+
+        Each step changes wealth by +/-bet, so z/bet must share parity with t.
+        Terminal step t=T is excluded (no decision is made there). Yielding
+        only these states matches paper Definition 5's domain for SW(pi)
+        (verified: reproduces paper's SPE Welfare to within 1 std).
+        """
+        for t in range(min(self.n_t, self.T)):
+            for k in range(-t, t + 1, 2):
                 yield (t, k * self.bet)
 
 
