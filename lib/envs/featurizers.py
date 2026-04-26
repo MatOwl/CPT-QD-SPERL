@@ -70,6 +70,53 @@ class BarberisFeaturizer(Featurizer):
                 yield (t, k * self.bet)
 
 
+class AbandonmentFeaturizer(Featurizer):
+    """LNW abandonment: obs = (t, x_idx), x_idx in {-T, ..., T}.
+
+    Parity-correct grid: at time t, reachable x_idx in {-t, -t+2, ..., t-2, t}.
+    """
+
+    def __init__(self, env):
+        self.T = env.T
+        self.delta = env.delta
+        self.c = env.c
+        self.x1 = env.x1
+        self.n_t = env.observation_space.spaces[0].n  # T+1
+        self.n_x = env.observation_space.spaces[1].n  # 2T+1
+        self.n_states = self.n_t * self.n_x
+
+    def loc(self, obs) -> int:
+        t, x_idx = int(obs[0]), int(obs[1])
+        return self.n_x * t + (self.T + x_idx)
+
+    def key(self, obs):
+        t, x_idx = obs
+        return (int(t), int(x_idx))
+
+    def cpt_offset(self, obs) -> float:
+        """LNW: state-dependent offset = current project value x_t (analogous
+        to Barberis cpt_offset = z, the current wealth). Mathematically:
+
+            CPT input = (cumulative future reward) + x_t
+                      = full payoff from this state onward
+                        (zero on abandon, x_T - (T-t)*c on full continuation)
+
+        This places the SPE-V at any abandon state at CPT(0) = 0, which matches
+        LNW's "abandon → 0 future payoff" semantics."""
+        _, x_idx = obs
+        return float(self.x1 + int(x_idx) * self.delta)
+
+    def iter_states(self):
+        """Decision states reachable from the default init (t=0, x_idx=0).
+
+        Each continue moves x_idx by ±1, so x_idx must share parity with t.
+        Terminal step t=T is excluded (no decision is made there).
+        """
+        for t in range(self.T):
+            for k in range(-t, t + 1, 2):
+                yield (t, k)
+
+
 class OptExFeaturizer(Featurizer):
     """Optimal execution: obs = (logRet_bin, remain_bin, X_bin).
 

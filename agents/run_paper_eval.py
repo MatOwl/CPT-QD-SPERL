@@ -55,6 +55,15 @@ def build_env(name, args):
             num_w=args.num_w,
             action_space_size=args.action_space_size,
         )
+    if name == "abandonment":
+        return make_env(
+            name,
+            p=args.p_win,
+            delta=args.delta,
+            c=args.c,
+            T=args.horizon,
+            x1=args.x1,
+        )
     raise ValueError(name)
 
 
@@ -77,6 +86,15 @@ def get_reference_policy(args, env):
         print(f"[ref] OptEx SPE oracle loaded, tree size = "
               f"{len(oracle.node_df)} nodes")
         return oracle.policy()
+    if args.env == "abandonment":
+        from lib.envs.abandonment_spe import compute_spe_policy, spe_policy_fn
+        print(f"[ref] solving LNW abandonment SPE via backward induction "
+              f"(n_eval_eps={args.spe_rollouts})")
+        spe_dict = compute_spe_policy(
+            env, CPTParams(args.alpha, args.rho1, args.rho2, args.lmbd),
+            n_eval_eps=args.spe_rollouts,
+        )
+        return spe_policy_fn(spe_dict)
     raise ValueError(args.env)
 
 
@@ -99,11 +117,23 @@ def main():
     parser.add_argument("--lmbd", type=float, default=1.5)
 
     # env
-    parser.add_argument("--horizon", type=int, default=5)
-    parser.add_argument("--p-win", type=float, default=0.6)
+    parser.add_argument("--horizon", type=int, default=5,
+                        help="[barberis] T = #decisions; "
+                             "[abandonment] T = #decisions = paper's T-1; "
+                             "[optex] horizon")
+    parser.add_argument("--p-win", type=float, default=0.6,
+                        help="[barberis/abandonment] up-move probability")
     parser.add_argument("--sigma", type=float, default=0.019)
     parser.add_argument("--num-w", type=int, default=4)
     parser.add_argument("--action-space-size", type=int, default=11)
+
+    # abandonment-specific
+    parser.add_argument("--delta", type=int, default=10,
+                        help="[abandonment] random-walk step size")
+    parser.add_argument("--c", type=int, default=11,
+                        help="[abandonment] continuation cost per step")
+    parser.add_argument("--x1", type=int, default=50,
+                        help="[abandonment] initial project value")
 
     # eval
     parser.add_argument("--eval-per-state", type=int, default=100,

@@ -36,6 +36,10 @@ def run_name_from_args(args, env):
         parts.append(f"p{args.p_win}")
     elif env == "optex":
         parts.append(f"sig{args.sigma}_numw{args.num_w}")
+    elif env == "abandonment":
+        parts.append(
+            f"T{args.horizon}_x1{args.x1}_c{args.c}_d{args.delta}_p{args.p_win}"
+        )
     parts.append(f"cpt_a{args.alpha}_r{args.rho1}_l{args.lmbd}")
     return "_".join(str(p) for p in parts)
 

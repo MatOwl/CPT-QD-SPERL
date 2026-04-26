@@ -39,6 +39,15 @@ def build_env(name, args):
             num_w=args.num_w,
             action_space_size=args.action_space_size,
         )
+    if name == "abandonment":
+        return make_env(
+            name,
+            p=args.p_win,
+            delta=args.delta,
+            c=args.c,
+            T=args.horizon,
+            x1=args.x1,
+        )
     raise ValueError(name)
 
 
@@ -74,14 +83,25 @@ def main():
 
     # env-specific
     parser.add_argument("--p-win", type=float, default=0.5,
-                        help="[barberis] win probability")
-    parser.add_argument("--horizon", type=int, default=5)
+                        help="[barberis/abandonment] up-move probability")
+    parser.add_argument("--horizon", type=int, default=5,
+                        help="[barberis] T=#decisions; "
+                             "[abandonment] T=#decisions=paper's T-1; "
+                             "[optex] horizon")
     parser.add_argument("--action-space-size", type=int, default=11,
                         help="[optex] action discretisation size")
     parser.add_argument("--sigma", type=float, default=0.019,
                         help="[optex] volatility; must match SPE file if provided")
     parser.add_argument("--num-w", type=int, default=4,
                         help="[optex] market-shock bins")
+
+    # abandonment-specific
+    parser.add_argument("--delta", type=int, default=10,
+                        help="[abandonment] random-walk step size")
+    parser.add_argument("--c", type=int, default=11,
+                        help="[abandonment] continuation cost per step")
+    parser.add_argument("--x1", type=int, default=50,
+                        help="[abandonment] initial project value")
 
     # exploration
     parser.add_argument("--eps", type=float, default=0.1,

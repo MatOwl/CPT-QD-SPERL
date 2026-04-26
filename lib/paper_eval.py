@@ -71,10 +71,25 @@ def rollout_cpt_from_state(
     return cpt_params.compute(list(rewards))
 
 
+def _is_abandonment(env) -> bool:
+    """Duck-type check: LNW abandonment env has delta + c + x1 attributes."""
+    return (
+        hasattr(env, "delta")
+        and hasattr(env, "c")
+        and hasattr(env, "x1")
+        and hasattr(env, "T")
+    )
+
+
+def _is_barberis(env) -> bool:
+    """Duck-type check: Barberis casino has bet + T but no LNW-specific attrs."""
+    return hasattr(env, "bet") and hasattr(env, "T") and not _is_abandonment(env)
+
+
 def _state_time(state, env):
     """Extract the current time-step from an env state for different envs."""
-    # Barberis: state = (t, z)
-    if hasattr(env, "bet") and hasattr(env, "T") and len(state) == 2:
+    # Barberis: state = (t, z); LNW: state = (t, x_idx). Both have t at index 0.
+    if (_is_barberis(env) or _is_abandonment(env)) and len(state) == 2:
         return int(state[0])
     # OptEx: state = (logRet_bin, remain_bin, X_bin); t = N - remain_bin * N / n_bins_N
     if hasattr(env, "remaining_num_trade"):
@@ -91,13 +106,20 @@ def barberis_reset_kwargs(init_state):
     return {"init_time": int(t), "init_wealth": int(z)}
 
 
+def abandonment_reset_kwargs(init_state):
+    t, x_idx = init_state
+    return {"init_time": int(t), "init_x_idx": int(x_idx)}
+
+
 def optex_reset_kwargs(init_state):
     return {"init_state": tuple(int(v) for v in init_state)}
 
 
 def reset_kwargs_builder(env):
     """Return the appropriate reset-kwargs builder for ``env``."""
-    if hasattr(env, "bet") and hasattr(env, "T"):
+    if _is_abandonment(env):
+        return abandonment_reset_kwargs
+    if _is_barberis(env):
         return barberis_reset_kwargs
     return optex_reset_kwargs
 
@@ -108,10 +130,23 @@ def barberis_initial_offset(init_state):
     return float(z)
 
 
+def abandonment_initial_offset_builder(env):
+    """LNW: state-dependent offset = current project value x_t = x_1 + x_idx*delta
+    (mirrors Barberis offset = current wealth z). Closure captures env params."""
+    x1 = float(env.x1)
+    delta = float(env.delta)
+    def _f(init_state):
+        _, x_idx = init_state
+        return x1 + int(x_idx) * delta
+    return _f
+
+
 def initial_offset_builder(env):
     """Return the env-specific initial-offset function (None for envs where
     the MDP reward's running sum is already the CPT-relevant quantity)."""
-    if hasattr(env, "bet") and hasattr(env, "T"):
+    if _is_abandonment(env):
+        return abandonment_initial_offset_builder(env)
+    if _is_barberis(env):
         return barberis_initial_offset
     return None
 
@@ -220,6 +255,6 @@ def compute_paper_metrics(
 
 def _to_obs(x, env):
     """Convert a state tuple back to the observation format env expects."""
-    if hasattr(env, "bet") and len(x) == 2:
+    if (_is_barberis(env) or _is_abandonment(env)) and len(x) == 2:
         return np.array([x[0], x[1]], dtype=np.float32)
     return np.asarray(x, dtype=np.intc)
