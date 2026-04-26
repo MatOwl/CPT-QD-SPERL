@@ -463,6 +463,7 @@ class GreedySPERL:
         rewards = []
         for _ in range(n_eval_eps):
             state = self.env.reset()
+            offset = float(self.featurizer.cpt_offset(state))
             total = 0.0
             while True:
                 a_probs = self.policy.predict(state, deterministic=True)
@@ -471,7 +472,10 @@ class GreedySPERL:
                 total += r
                 if done:
                     break
-            rewards.append(total)
+            # CPT input = init-state offset + cumulative reward (Barberis & OptEx
+            # have offset=0 at reset; LNW has offset=x_1 -> matches paper-eval
+            # rollout_cpt_from_state semantics).
+            rewards.append(total + offset)
         rewards = np.asarray(rewards)
         cpt_val = self.critic.cpt_params.compute(list(rewards))
         return rewards.mean(), rewards.std(), cpt_val
@@ -485,6 +489,7 @@ class GreedySPERL:
         rewards = []
         for _ in range(n_eval_eps):
             state = self.env.reset()
+            offset = float(self.featurizer.cpt_offset(state))
             total = 0.0
             t = 0
             while True:
@@ -494,7 +499,7 @@ class GreedySPERL:
                 t += 1
                 if done:
                     break
-            rewards.append(total)
+            rewards.append(total + offset)
         rewards = np.asarray(rewards)
         cpt_val = self.critic.cpt_params.compute(list(rewards))
         return rewards.mean(), rewards.std(), cpt_val
