@@ -136,6 +136,7 @@ class SPSAAgent:
     # ---- rollout under the current (perturbed) policy ----
     def _rollout_return(self):
         state = self.env.reset()
+        offset = float(self.featurizer.cpt_offset(state))
         total = 0.0
         for _ in itertools.count():
             probs = self.policy.predict(state)
@@ -144,13 +145,16 @@ class SPSAAgent:
             total += r
             if done:
                 break
-        return total
+        # CPT input = initial-state offset + cumulative reward (mirrors SPERL
+        # QR critic; for Barberis & OptEx the offset is 0, for LNW it's x_t).
+        return total + offset
 
     # ---- deterministic (unperturbed) evaluation ----
     def evaluate(self, n_eval_eps):
         rewards = []
         for _ in range(n_eval_eps):
             state = self.env.reset()
+            offset = float(self.featurizer.cpt_offset(state))
             total = 0.0
             for _ in itertools.count():
                 probs = self.policy.predict(state, deterministic=True)
@@ -159,7 +163,7 @@ class SPSAAgent:
                 total += r
                 if done:
                     break
-            rewards.append(total)
+            rewards.append(total + offset)
         rewards = np.asarray(rewards)
         return rewards.mean(), rewards.std(), self.cpt_params.compute(list(rewards))
 
@@ -173,6 +177,7 @@ class SPSAAgent:
         rewards = []
         for _ in range(n_eval_eps):
             state = self.env.reset()
+            offset = float(self.featurizer.cpt_offset(state))
             total = 0.0
             t = 0
             while True:
@@ -182,7 +187,7 @@ class SPSAAgent:
                 t += 1
                 if done:
                     break
-            rewards.append(total)
+            rewards.append(total + offset)
         rewards = np.asarray(rewards)
         return rewards.mean(), rewards.std(), self.cpt_params.compute(list(rewards))
 
