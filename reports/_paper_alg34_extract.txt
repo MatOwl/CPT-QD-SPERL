@@ -1,0 +1,354 @@
+===== PAGE 48 =====
+Authors’ names not included for peer review
+48 Article submitted to Management Science
+Algorithm 2 CPT QR Q-learning
+1: Require: MDP Simulator, 𝛾, CPT Parameters (𝛼, 𝛿, 𝜆, 𝐵), Hyperparameters (𝑀, ¯𝑇 , 𝜉, 𝐾, 𝜚)
+2: Output: Quantile estimates 𝜑−
+1:𝐾 (𝑥, 𝑎), ∀𝑥, 𝑎
+3: Initialize: 𝜑0
+1:𝐾 (𝑥, 𝑎) ← 0, ∀𝑥, 𝑎; 𝜋0(𝑥) ← arg max𝑎 C
+h
+1
+𝐾
+Í𝐾
+𝑘=1 𝛿𝜑0
+𝑘 (𝑥,𝑎 )
+i
+, ∀𝑥;
+4: for 𝑖 ← 0 to 𝑀 − 1 do
+5: Sample 𝑋0, 𝐴0, 𝑅1, . . . , 𝑋 ¯𝑇−1, 𝐴 ¯𝑇−1, 𝑅 ¯𝑇 , 𝑋 ¯𝑇 ∼ 𝝅𝑖 (𝜉-greedy)
+6: for 𝑡 ← ¯𝑇 − 1 to 0 do
+7: Set 𝑥 = 𝑋𝑡, 𝑎 = 𝐴𝑡, 𝑟 = 𝑅𝑡+1, 𝑥′ = 𝑋𝑡+1
+8: if 𝑥′ = 𝑥𝑣𝑜𝑖𝑑 then
+9: Set TD target ˆT 𝜑 𝑗 = 𝑟, ∀ 𝑗 = 1, 2, . . . , 𝐾
+10: else
+11: Set 𝑞 𝑗 = 1 𝜑𝑖+1
+𝑗 (𝑥′,𝑎′)<𝐵 (𝑤 (𝜏𝑗 ) − 𝑤 (𝜏𝑗−1)) + 1 𝜑𝑖+1
+𝑗 (𝑥′,𝑎′)≥ 𝐵 (𝑤 (1 − 𝜏𝑗−1) − 𝑤 (1 − 𝜏𝑗 )), ∀ 𝑗
+12: Compute 𝑄(𝑥′, 𝑎′) = Í𝐾
+𝑗=1 𝑞 𝑗 𝑢(𝜑𝑖+1
+𝑗 (𝑥′, 𝑎′)) , ∀𝑎′ ∈ A𝑥′
+13: Compute 𝑎∗ ∼ arg max𝑎′ 𝑄(𝑥′, 𝑎′) (with consistent tie-breaks)
+14: Set TD target ˆT 𝜑 𝑗 = 𝑟 + 𝛾𝜑 𝑖+1
+𝑗 (𝑥′, 𝑎∗), ∀ 𝑗 = 1, 2, . . . , 𝐾
+15: for 𝑘 ← 1 to 𝐾 do
+16: Compute TD errors 𝜀𝑘 𝑗 = ˆT 𝜑 𝑗 − 𝜑𝑖
+𝑘 (𝑥, 𝑎), ∀ 𝑗 = 1, 2, . . . , 𝐾
+17: Update 𝜑𝑖+1
+𝑘 (𝑥, 𝑎) ← 𝜑𝑖
+𝑘 (𝑥, 𝑎) + 𝜚∇𝜑𝑘
+Í
+𝑗 𝜌 ˆ𝜏𝑘 (𝜀𝑘 𝑗 )
+18: end for
+19: end if
+20: end for
+21: end for
+Goal States and Stopping Actions Note that in Algorithm 2, we address both the infinite-horizon and finite-
+horizon settings. To handle the presence of goal states and stopping actions in the finite-horizon setting, we add a
+boundary condition in Lines 8-9. To relate the update target in Line 14 to that in Line 9, recall the control update
+for 𝑥, 𝑎 ∈ ¯X × ¯A in (27). By proceeding with similar approximation steps, including QR, with T 𝜂𝑖 (𝑥, 𝑎) replaced by
+𝑅(𝑥, 𝑎), we obtain Line 9. Note the SA step can be skipped as 𝑍 (𝑛) = 𝑟 ∼ 𝑅(𝑥, 𝑎).
+C.2.2. Selecting Greedy Actions Our control update requires the selection of greedy action 𝑎∗ to improve our
+policy in the direction of the target SPE. In what follows, we discuss the computation and selection of such greedy
+action, as well as some design choices that are based on the existing results in equilibrium learning via RL; see Lesmana
+and Pun (2025), Lesmana et al. (2022) for the analogous SPERL algorithm.
+
+===== PAGE 49 =====
+Authors’ names not included for peer review
+Article submitted to Management Science 49
+CPT Q-values from QR estimates The CPT QDRL control require computing greedy actions 𝑎∗ ∼
+arg max𝑎′ 𝑄𝑖 (𝑥′, 𝑎′). In Algorithm 2, this can be seen from Line 13. Lines 11-12 then compute the correspond-
+ing Q-value 𝑄𝑖 (𝑥′, 𝑎′) = C[𝜂𝑖 (𝑥′, 𝑎′)] by replacing the true distribution 𝜂𝑖 (𝑥′, 𝑎′) with its (discrete) Dirac-mixture
+approximation, 1
+𝐾
+Í
+𝑘 𝛿 𝜑𝑖
+𝑘 ( 𝑥′ ,𝑎 ′ ), and expanding the CPT formula in (13).
+Consistent tie-breaks We follow the standard SPERL guidelines for addressing possibly non-unique SPEs (see
+(Lesmana and Pun 2025, Section 3.3)) by adopting consistent tie-breaks for our greedy actions selection in Line 13.
+To this end, we simply need to memorize our previous action selection at𝑥′, i.e., 𝜋𝑖 (𝑥′), and update our selection only
+when it strictly improves CPT value at 𝑥′; see this subroutine in Algorithm 3. Several distributional RL works, e.g.,
+Bellemare et al. (2017), Lim and Malik (2022), have suggested the importance of consistent tie-breaks in ensuring
+convergence, which is also in line with our observation in Remark 3. In Appendix C.4.2 (Figure 12), we provide
+evidence of how inconsistently selecting greedy actions may adversely impact SPE learning.
+Algorithm 3 Consistent Tie-Break
+1: Input: 𝑥′, 𝜋𝑖 (𝑥′), {𝑄(𝑥′, 𝑎′) : 𝑎′ ∈ A𝑥′ }
+2: Output: 𝑎∗ ∼ 𝜋𝑖+1(𝑥′)
+3: if max𝑎′ 𝑄(𝑥′, 𝑎′) > 𝑄 (𝑥′, 𝜋𝑖 (𝑥′)) then
+4: Update 𝜋𝑖+1(𝑥′) ← arg max𝑎′ 𝑄(𝑥′, 𝑎′) (random tie-breaks)
+5: else
+6: Update 𝜋𝑖+1(𝑥′) ← 𝜋𝑖 (𝑥′)
+7: end if
+Backward updates Finally, we follow the standard SPERL guidelines (see (Lesmana and Pun 2025, Section
+3.3)) for ensuring (lex-)monotonicity by adopting backward updates in Algorithm 2, Line 6. Aside from its theoretical
+motivation, backward updates have been shown to empirically improve update efficiency; see Lesmana et al. (2022).
+Backward updates essentially mean to evaluate the policy of a certain player 𝑥 conditioned to the updated strategy of
+later players 𝑥′. In our context, we modify the indexes of𝑥′ in Lines 11-14 to 𝑖 + 1. Such indexing can be interpreted as
+modifying the CPT QDRL control updates in (22) and (27) to,
+∀𝑥, 𝑎 ∉ ¯X ∪ ¯A, 𝜂 𝑖+1 (𝑥, 𝑎) ← Π𝑊1 T 𝜂𝑖+1 (𝑥, 𝑎) (74)
+From (74), we can derive the sample-based update target( 𝑓𝑟 ,𝛾)#𝜂𝑖+1(𝑥′, 𝑎∗), which fully relies on the quantile estimates
+of next state-action pairs (𝑥′, 𝑎′). This allows the (𝑖 + 1)-indexing since the functions of (𝑥′, 𝑎′) are updated before 𝑥
+and the only dependence on (𝑥, 𝑎) is through the MDP simulator 𝑥′ ∼ 𝑝(·|𝑥, 𝑎), which is free of any update indexes.
+Note that Line 14 in Algorithm 2 has incorporated such backward updates and is thus indexed by 𝑖 + 1 unlike what we
+expect from the sample-based derivations in Section C.2.1.
+
+===== PAGE 50 =====
+Authors’ names not included for peer review
+50 Article submitted to Management Science
+Figure 11 Filtering Illustration
+C.2.3. Filtering Through our theoretical analyses in Section 3, we have seen how CPT prediction errors may
+translate to SPE learning performance, where we can manage our errors (make them as small as possible) by increasing
+𝐾. Algorithm 2 is a sample-based (approximate) version of QDRL with QR and SA playing significant roles in its
+update construction. Through this section, we propose a filtering method as another subroutine in Algorithm 4 to
+address two scenarios that interfere with CPT predictions in Algorithm 2.
+Discrete return distributions. One requirement for QR is a continuous target variable since otherwise, the
+quantile function becomes not bijective. However, in our context, this target variable is the return distributions and
+there are many environments (including ours) that induce discrete return distributions. Despite we can still run the
+QR-based update in Algorithm 2, Line 17 as it is, our experiments suggest that given a discrete target distribution, the
+quantile estimates converge to the quantiles of a “smoothened” version of the target. This introduces irreducible errors
+that will interfere with SPE learning when the error magnitude is larger than the corresponding action gap. Algorithm
+4 addresses this issue by filtering out the “smoothened” parts (𝑑 𝑗 > 𝑑 ∗ in Line 6) of the distribution estimate output by
+Algorithm 2 and sharpening the entire quantiles (Lines 11-15) to emulate discrete distributions better; see Figure 11
+for illustration. The hyperparameter 𝑓 𝑖𝑙𝑡𝑒𝑟𝑇𝑟𝑒𝑠ℎ controls how many quantiles are filtered out, while the𝑡𝑟𝑒𝑠ℎ𝑅𝑎𝑡𝑖𝑜 is
+used (Lines 20-22) to prevent the filter from throwing away too many quantiles such that the filtered distribution itself
+does not reflect the QR estimates; for instance, when a discrete target distribution has more values in its support, the
+same filterTresh may cut out some informative parts believing that they are “smoothened”.
+Crossing quantiles. Another issue that can be commonly found in quantile approximation is crossing quantiles,
+where the quantile estimates 𝜑𝑘 are not monotonically increasing in 𝑘. In our context, this issue mainly arises from the
+SA step with finite samples 𝑁. We can expect such noisy and crossing quantiles to interfere with CPT prediction that
+makes use of all quantile values and locations, with CPT weights attached to each. Algorithm 4 alleviates this issue by
+filtering out the quantiles that are less than its preceding quantile ( 𝑑 𝑗 < 0 in Lines 5-6). The output of Algorithm 4 is
+applied to replace the quantile estimates𝜑𝑖+1
+𝑗 (𝑥′, 𝑎′) in Algorithm 2, Lines 11-12 with filtered quantiles𝜑filtered
+𝑗 (𝑥′, 𝑎′).
+C.2.4. Initialization The original version of the algorithm initializes all quantile estimates to 0 (see Algorithm 2,
+Line 3). However, this may not suffice for environments with return distributions supported far from 0. We address this
+issue by re-initializing the quantile estimates of each(𝑥, 𝑎), upon (𝑥, 𝑎)’s first visit (in Algorithm 2, Line 7), according
+to the sampled TD targets (in Algorithm 2, Lines 9 and 14), i.e., 𝜑0
+1:𝐾 (𝑥, 𝑎) ← 1
+𝐾
+Í𝐾
+𝑗=1 ˆT 𝜑 𝑗.
+
+===== PAGE 51 =====
+Authors’ names not included for peer review
+Article submitted to Management Science 51
+Algorithm 4 Filtering
+1: Require: Hyperparameters (filterTresh, treshRatio)
+2: Input: Quantile estimates 𝜑𝑖+1
+1:𝐾 (𝑥′, 𝑎′)
+3: Output: Filtered quantiles 𝜑filtered
+1:𝐾 (𝑥′, 𝑎′)
+4: Get quantile differences 𝑑 𝑗 = 𝜑 𝑗 − 𝜑 𝑗−1, ∀ 𝑗 = 2, 3, . . . , 𝐾
+5: Set 𝑑∗ ← sampleQuantiles(𝑑2:𝐾, filterTresh)
+6: Set ∀ 𝑗 = 2, 3, . . . , 𝐾, bool 𝑗 ← 1 0≤𝑑 𝑗 ≤𝑑∗ and bool1 ← bool2
+7: for 𝑗 ← 1 to 𝐾 do
+8: if bool 𝑗 = 𝑇 𝑅𝑈𝐸 then
+9: Set 𝜑filtered
+𝑗 (𝑥′, 𝑎′) ← 𝜑𝑖+1
+𝑗 (𝑥′, 𝑎′)
+10: else
+11: Find smallest 𝑗𝑢 > 𝑗 where bool 𝑗𝑢 = 𝑇 𝑅𝑈𝐸
+12: Find largest 𝑗𝑙 < 𝑗 where bool 𝑗𝑙 = 𝑇 𝑅𝑈𝐸
+13: Compute dist𝑙 ← | 𝜑𝑖+1
+𝑗 (𝑥′, 𝑎′) − 𝜑𝑖+1
+𝑗𝑙
+(𝑥′, 𝑎′)|
+14: Compute dist𝑢 ← | 𝜑𝑖+1
+𝑗𝑢
+(𝑥′, 𝑎′) − 𝜑𝑖+1
+𝑗 (𝑥′, 𝑎′)|
+15: Set 𝜑filtered
+𝑗 (𝑥′, 𝑎′) ← 1 dist𝑙 <dist𝑢 𝜑 𝑗𝑙 (𝑥′, 𝑎′) + 1 dist𝑙 ≥dist𝑢 𝜑 𝑗𝑢 (𝑥′, 𝑎′)
+16: end if
+17: end for
+18: Compute 𝑄filtered(𝑥′, 𝑎′) = C
+h
+1
+𝐾
+Í𝐾
+𝑗=1 𝛿𝜑filtered
+𝑗 (𝑥′,𝑎′)
+i
+19: Compute 𝑄(𝑥′, 𝑎′) = C
+h
+1
+𝐾
+Í𝐾
+𝑗=1 𝛿𝜑𝑖+1
+𝑗 (𝑥′,𝑎′)
+i
+20: if |𝑄filtered(𝑥′, 𝑎′) − 𝑄(𝑥′, 𝑎′)| > treshRatio then
+21: Reset 𝜑filtered
+1:𝐾 (𝑥′, 𝑎′) ← 𝜑𝑖+1
+1:𝐾 (𝑥′, 𝑎′)
+22: end if
+C.2.5. Hyperparameters We use Algorithm 2 with firstVisit initialization and filtering, as described in Section
+C.2 and Algorithm 4, respectively. For our experiments, we set the hyperparameters as follows,
+• NumofTrainEpisodes 𝑀 = 15000
+• LengthofEpisode ¯𝑇 = 𝑇 + 1 = 6
+• ExploreRate 𝜉 = .3
+• SupportSize 𝐾 = 50
+• LearningRate 𝜚 = .04
+• filterTresh ∈ [ .75, 1.], treshRatio = .5
+C.3. Benchmark Policies
+C.3.1. True SPE In our environment with finite-horizon and discrete state-action spaces, the true SPE can be
+computed by simply performing backward induction on the decision trees that span all states and actions X × A. The
+
+===== PAGE 52 =====
+Authors’ names not included for peer review
+52 Article submitted to Management Science
+Algorithm 5 True SPE for CPT Criterion
+1: Require: MDP Simulator, 𝛾, 𝑇, CPT Parameters (𝛼, 𝛿, 𝜆, 𝐵), 𝑀 = 2000
+2: Output: SPE ˆ𝜋(𝑥), ∀𝑥
+3: Initialize: ∀𝑥, ˆ𝜋(𝑥) ← ∅
+4: for 𝑡 ← 𝑇 − 1 to 0 do
+5: for 𝑥𝑡 ∈ X𝑡 do
+6: for 𝑎𝑡 ∈ {’exit’, ’gamble’} do
+7: Initialize empirical return distribution 𝑍 ← ∅
+8: for 𝑚 ← 1 to 𝑀 do
+9: Sample 𝑥𝑡, 𝑎𝑡, 𝑅𝑡+1, . . . , 𝑋𝑇−1, 𝐴𝑇−1, 𝑅𝑇 , 𝑋𝑇 ∼ ˆ𝝅
+10: Update returns 𝑍 ← 𝑍 ∪ {𝑅𝑡+1 + 𝛾𝑅 𝑡+2 + . . . + 𝛾𝑇−𝑡−1𝑅𝑇 }
+11: end for
+12: Compute 𝑄(𝑥𝑡, 𝑎𝑡) = C [𝑍]
+13: end for
+14: Update ˆ𝜋(𝑥𝑡) ← arg max𝑎𝑡 𝑄(𝑥𝑡, 𝑎𝑡)
+15: end for
+16: end for
+main distinction between this method and our SPERL is that Q-estimate is updated (i) using TD method (QDRL, instead
+of MC as in Algorithm 5, Line 7-12), and (ii) only when𝑥, 𝑎 is visited by a sampled trajectory (without requiring direct
+knowledge of X, A).
+C.3.2. LossExit Inspired by the loss-exit strategy Barberis (2012), we construct the LossExit policy,
+∀𝑥 = (𝑡, 𝑠) ∈ X , 𝜋𝐿𝐸 (𝑥) =
+(
+’exit’, if 𝑠 < 0
+’gamble’, otherwise (75)
+Note that despite LossExit is a loss-exit strategy, it is not necessarily precommitment. We can however expect that in
+CPT95, where precommitment is characterized by loss-exit (see C.1.1 for details), the LossExit policy in (75) is close
+to precommitment. For instance, from our CPT95 results in Table 1, we can see that LossExit’s OPT dominates all
+alternative strategies’ in all MDP setups.
+C.3.3. GainExit Inspired by the gain-exit strategy Barberis (2012), we construct the GainExit policy,
+∀𝑥 = (𝑡, 𝑠) ∈ X , 𝜋𝐺𝐸 (𝑥) =
+(
+’exit’, if 𝑠 > 0
+’gamble’, otherwise (76)
+
+===== PAGE 53 =====
+Authors’ names not included for peer review
+Article submitted to Management Science 53
+Similarly, as in the case of LossExit, we can expect the GainExit policy’s closeness to the dynamic optimum in CPT95,
+where the dynamic optimum is characterized by gain-exit (see C.1.1 for details). For instance, from our results in Section
+4.2, we can see GainExit attains relatively high welfare yet severely lacks in optimality. These properties correspond to
+dynamic optimum properties in some well-known setupsPedersen and Peskir (2016), Vigna (2020), O’Donoghue and
+Rabin (1999) by being TC yet attaining the worst value at 𝑥0 among the three TIC-aware control objectives.
+C.3.4. SPSA (CPT-SPSA-G) CPT-SPSA-G(Prashanth et al. 2016, Algorithm 2) is an episodic policy gradient
+algorithm that targets global optimality (in Definition 2); see our short discussion on why so in Section 1. First, note
+that the notations of this section will be kept local to match the original. For our implementation, the SPSA stochastic
+policy is parameterized by𝜃 ∈ R| X | × | A |such that 𝜋(·|𝑥; 𝜃) = softmax(𝜃𝑇 𝜙𝑥) ∈ [ 0, 1] | A |, where 𝜙𝑥 ∈ R| X | is the one-hot
+representation of every state𝑥 ∈ X. For setting up the step-size𝛾𝑛 and perturbation constants 𝛿𝑛, we follow the standard
+guidelines(Prashanth et al. 2016, Section 5), with slight modifications by tuning some constants. In particular, we set
+𝛾𝑛 = 5.
+𝑛+50 while keeping 𝛿𝑛 = 1.9(𝑛 + 1) −.101. We initialize our parameter 𝜃0 ← 0 and clip 𝜃𝑛 ∈ [ .1, 2.] to realize the
+projection operator Ψ. Finally, we set the trajectory generation parameter𝑚𝑛 = 50.
+C.4. Additional Results
+C.4.1. Tuning Filtering Hyperparameters Tables 3 and 4 present the policy and value errors𝑚𝑒𝑎𝑛 𝑠𝑡 𝑑𝑒𝑣 of SPERL
+for different filtering hyperparameters filterTresh (with fixed treshRatio= .5 or 0 when filterTresh= 1.); see Appendix
+C.2.3 for their definitions. The Pareto-optimal performing filters with policy and value error means as objectives were
+asterisked. From these tables, we observe that across several CPT-MDP setups, tuning filter parameters can help reduce
+errors (note that filterTresh= 1. is equivalent to no filter). This provides empirical evidence for the usefulness of our
+filtering method in Appendix C.2.3.
+Table 3 Policy errors ( 𝑚𝑒𝑎𝑛 𝑠𝑡 𝑑𝑒𝑣 ) across filters.
+filter
+1. .95 .9 .85 .8 .75
+CPT88
+.89.1 .44.05∗ .67.06 .78.08 1.33.12 1.11.11 .72
+𝑝𝑤𝑖𝑛
+5.11.24 3.44.25 2.89.13∗ 3..31 3..19 3.11.17 .66
+1.22.14 1.44.17 .78.12 .67.11∗ 1.11.14 .78.13 .6
+1.67.17 1.56.16 1.11.16 1.33.16 .56.1∗ 1..15 .54
+1.67.16∗ 2.11.21 3.33.23 2.44.18 2.78.26 2.33.2 .48
+CPT95
+1.11.06 .88.09∗ 1.11.13 1.22.13 1.11.13 1.44.14 .72
+.22.03∗ .44.06 .78.08 .56.06 .22.04 1..09 .66
+.22.04 .11.02 .22.04 .22.04 .11.02∗ .11.02 .6
+.67.09 .78.12 .78.06 .44.06∗ .67.05 .89.05 .54
+.22.03 .44.06 .22.04∗ .56.06 .56.09 .78.1 .48
+Notes. In each row, the best-performing (filtered) SPERL are highlighted in blue while
+best here means Pareto-optimal with mean and stdev as two objectives.
+C.4.2. Different Sources of SPE Learning Errors We discuss several possible causes of the SPE learning errors
+in Appendix 4.1. Recall that in Appendix C.2.3, we have noted how the interplay between QR and SA may induce
+some practically irreducible CPT prediction errors. While our filtering scheme can reduce them to some extent, these
+errors cannot be fully eliminated since it is not practical to have very large 𝑁 → ∞ at every state-action pair.
+
+===== PAGE 54 =====
+Authors’ names not included for peer review
+54 Article submitted to Management Science
+Table 4 Value errors ( 𝑚𝑒𝑎𝑛 𝑠𝑡 𝑑𝑒𝑣 ) across filters.
+filter
+1. .95 .9 .85 .8 .75
+CPT88
+5.98.78 3.71.63∗ 5.41.62 5.9.72 8.32.82 7.9.74 .72
+𝑝𝑤𝑖𝑛
+14.721.05 10.66.77 9.3.95∗ 9.471.29 8.82.12 9.721.24 .66
+2.79.35 2.86.43 1.68.36 1.65.4∗ 1.71.31 1.58.3 .6
+4.96.46 3.57.42 3.55.49 3.79.43 2.37.41∗ 2.29.62 .54
+4.22.44∗ 5.82.57 8.16.44 5.74.47 5..69 3.98.52 .48
+CPT95
+4.91.3 3.28.31∗ 3.93.5 2.73.5 2.57.47 4.34.5 .72
+1.91.27∗ 3.41.36 4.35.41 3.74.34 1.24.33 5.43.47 .66
+.94.14 .6.16 .58.16 .52.15 .56.17∗ .84.17 .6
+3.3.37 1.88.36 1.39.17 1.13.17∗ 1.08.18 1.35.18 .54
+2.16.27 2.5.34 1.21.25∗ 3.35.37 2.65.4 2.74.41 .48
+Notes. In each row, the best-performing (filtered) SPERL are highlighted in blue while best
+here means Pareto-optimal with mean and stdev as two objectives.
+The first source of SPE learning error comes from the states with very small action gaps. Here, even small prediction
+errors will induce either incorrect or inconsistent greedy action selections; see Figure 12(a) for instance, where the
+small gap between the true SPE 𝑄(’exit’) and 𝑄(’gamble’) causes SPERL ’s selection to keep jumping between ’exit’
+and ’gamble’. The inconsistent selections in this example are reminiscent of the case when two actions on the same
+state ”tie” in value and ties are broken randomly to select either one of them. Consistent tie-breaks (see Appendix
+C.2.2) are proposed to address such issues. Note however that here, we are not dealing with actual ties, but perceived
+ties by the algorithm due to erroneous Q-function estimates; intuitively, for a small action gap Δ, we have Δ-ties that
+are induced by errors larger than Δ.
+The second error source comes from the first source when propagated to other states; in our context, the first source
+normally happens at later times 𝑡 and backpropagates to states at earlier times. Consider the inconsistent greedy action
+selections at the state 𝑥′ = (4, 20) in Figure 12(a). Figure 13(b) records the evolution of CPT value at state 𝑥 = (3, 10)
+for both actions ’exit’ and ’gamble’; note that𝑥 is an earlier state w.r.t 𝑥′ in our environments for it is visited earlier in
+a trajectory generated from 𝑥0 = (0, 0). Let us now focus on SPERL ’s (solid line) vs SPE’s (dotted line)𝑄(’gamble’).
+To break down how the small errors in Figure 12(a) can induce SPERL ’s relatively large errors in Figure 12(b), the
+inconsistent choice of greedy actions 𝑎∗ in Figure 12(a) will affect the return distribution of 𝜂(𝑥′, 𝑎∗), which in turn
+affects the return distribution of 𝜂(𝑥, 𝑎 =’gamble’) by QDRL ’s TD update; note that since𝑎 =’gamble’,𝑥 = (3, 10) will
+transit to 𝑥′ = (4, 20) w.p. .6 > 0. Figure 12(c) records the evolution of (quantile-based) estimate of 𝜂(𝑥, 𝑎 =’gamble’),
+where the ’darkest’ (resp. ’lightest’) colored lines correspond to when𝑎∗ =’gamble’ (resp.𝑎∗ =’exit’) in Figure 12(a).
+After applying CPT functional on the distribution estimates in Figure 12(c), these ’darkest’ (resp. ’lightest’) colored
+lines translate to some iterations in Figure 12(b) when SPERL𝑄(’gamble’) is above (resp. below)𝑄(’exit’). Note that
+in Figure 12(a), the groundtruth (dotted) prescribes ’gamble’ such that the darkest colored lines in 12(c) are expected to
+be close to the groundtruth. However, as we can see from Figure 12(b), the groundtruth (dotted) is relatively far from the
+darkest line estimates. To explain this difference, one can observe that the ’darkest’ line in Figure 12(c) has not perfectly
+reflected the groundtruth (that is expected to have a sharper edge on 𝑦-values {0, 10, 30}). This is due to the quantile
+estimates keep getting dragged to the ’lighter’ colored lines as Figure 12(a) chooses the incorrect ’exit’ as frequently
+as the groundtruth ’gamble’, resulting in the darkest colored lines instead reflecting the mixture between distribution
+
+===== PAGE 55 =====
+Authors’ names not included for peer review
+Article submitted to Management Science 55
+Figure 12 SPE Learning Error Source Illustration: CPT88, 𝑝𝑤𝑖𝑛 = .66.
+(a) Evolution of CPT (4, 20) estimates
+ (b) Evolution of CPT (3, 10) estimates
+(c) Quantile-based CDF (3, 10) estimates
+under the two greedy actions in Figure 12(a). Further note that despite the small difference between ’gamble’ and ’exit’
+CPT values in Figure 12(a), the difference in their corresponding distributions propagated to earlier states has resulted
+in a much larger difference in CPT values (dotted vs solid orange lines) in Figure 12(b). This observation relates to our
+discussion in Remark 3 and Appendix C.2.2 on what sets apart QDRL iterative behavior from the standard RL.
+While the relatively large errors in CPT88 with𝑝𝑤𝑖𝑛 = .66 (see Table 3 and Figure 6(b)) can be explained by the first
+and second types of error, we acknowledge the presence of a third error source that involves a pre-convergence behavior
+from low visitation frequencies 𝑁 (𝑥, 𝑎) to a given state and action (𝑥, 𝑎). To see this, in Figure 13, the first column
+records the evolution of CPT estimates at different states. Figure 13(e),(g) exemplify the states with erroneous greedy
+action selection (note their larger stdev compared to the remaining states), that is associated to the states’ relatively low
+visitation in Figure 13(f),(h).
+References
+´Alvaro Cartea, Jaimungal S, S´anchez-Betancourt L (2023)Reinforcement Learning for Algorithmic Trading, chapter 13,
+230–250 (Cambridge University Press), ISBN 9781316516195, URL http://dx.doi.org/10.1017/
+9781009028943.014.
+Angiuli A, Fouque JP, Lauri `ere M (2023) Reinforcement Learning for Mean Field Games, with Applications to
+Economics, chapter 21, 393–425 (Cambridge University Press), ISBN 9781316516195, URL http://dx.
+doi.org/10.1017/9781009028943.014.
