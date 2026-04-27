@@ -1,6 +1,6 @@
 # 交接文档 — CPT-QD-SPERL paper 复现
 
-**最后更新**: 2026-04-27 (BLN consumption env MVP 实施完成；2026-04-26 之前: LNW abandonment env 实施完成，paper §4 deliverable 全套就位；Phase A+B+C refactor verification 完成在前)
+**最后更新**: 2026-04-27 (refactor ↔ L-原 native 一致性 ✅；BLN consumption env MVP 实施完成；2026-04-26 之前: LNW abandonment env 实施完成，paper §4 deliverable 全套就位；Phase A+B+C refactor verification 完成在前)
 
 任务: 验证 refactor 后的 generic SPERL 是否和 paper (`paperRef/MSci_MANUSCRIPT.pdf`) 对得上。
 
@@ -11,7 +11,7 @@
 | Refactor 引入的 3 个语义 bug | ✅ 已修 (cpt_offset hook + featurizer/SPE 修补) |
 | Refactor pure-fn 一致性 (Phase A unit isolation) | ✅ compute_CPT 100% ≡ legacy；filter ⚠️ paper-pseudocode-faithful（legacy 偏离 paper 文字）；env ✓ |
 | Refactor critic update 一致性 (Phase B unit isolation) | ✅ first-visit ≡；QR grad ≡ legacy 用向量化版后 bit-exact；当前 generic 比 legacy fp 更精确 |
-| Refactor e2e 一致性 (Phase C 10-seed legacy aggregate) | ⚠️ Phase C 用的 "L-仿" driver 在 ~19% near-tie state 上 fp-flip ≠ L-原 native；-0.89 数字需用 L-原 native 重测 |
+| Refactor e2e 一致性 (Phase C 10-seed legacy aggregate) | ✅ L-原 native 重测 (CPT88/p=0.66/filter=0.9): 4 metric 全在 0.5σ 内 (Opt 0.45±2.63 vs 1.46±1.71). [reports/2026-04-27_refactor_vs_legacy_p066.md](reports/2026-04-27_refactor_vs_legacy_p066.md) |
 | Paper Tables 数字源于 legacy？| ❌ legacy 自己都跑不出 paper 2.74，paper 用的不是这份代码 |
 | Welfare 求和域 vs paper Definition 5 | ✅ 已对齐 (Barberis featurizer fix) |
 | Algorithm 3/4 port 到 generic path | ✅ 完成，默认 off, 向后兼容 |
@@ -23,8 +23,8 @@
 | ≥10 seeds head-to-head ablation 完成 | ✅ done; 3-seed 数据全部翻案 (见 alg34_paper_diff report) |
 | VE 系统性 2.5× 高于 paper (我们 ~24 vs paper ~9.3) | ❌ 全 ablation 配置都受影响，独立于 Alg 3/4 |
 | Acceptance gate=0.5 cost ~1.65 Optimality | ⚠️ 跨 3-seed/10-seed 都存在，paper default 反而压低我们 |
-| Legacy `rerun_GreedySPERL_QR__main.py` 独立校验 | ❌ 未做 |
-| CPT95 全 p_win 完整复现 | ❌ 未做 |
+| Legacy `rerun_GreedySPERL_QR__main.py` 独立校验 | ✅ S1+S2+S3 加速 + active config 改 refactor-matched 后 bit-exact 复现 2023 ref，aggregate ≈ refactor |
+| Paper Tables 1/2 全 10 cells 复现 (refactor v3, 10 seeds, paper §C.2.5 hyperparams) | ✅ Opt 9/10 在 1σ (only CPT88/0.66 fail at 1.66σ — paper "hardest convergence" cell); SW 6/10 在 1σ (CPT95 低 p_win 系统性偏 1-2σ negative). v3 fixed v1 错抽 paper 数字 + v2 对齐 treshRatio=0.5. [reports/2026-04-27_paper_tables_1_2_full_sweep.md](reports/2026-04-27_paper_tables_1_2_full_sweep.md) |
 | OptEx 自我 backward induction SPE oracle | ❌ 未做 |
 | **LNW abandonment env 实施 (回应 AE point 6)** | ✅ env class + SPE oracle + featurizer + CLI 全到位 |
 | **LNW grid sweep (T × p_win × CPT_regime, 8 cells)** | ✅ SW match 97.6%-100.2%, Optimality 0-11.67 |
@@ -115,3 +115,5 @@ Packages: numpy==1.26.3 (gym 0.26 硬要求 <2), scipy, pandas, matplotlib, gym=
 | 2026-04-26 | LNW grid sweep 8 cells (T × p_win × CPT_regime) | [reports/2026-04-26_lnw_grid_results.md](reports/2026-04-26_lnw_grid_results.md) |
 | 2026-04-26 | LNW paper §4 deliverable summary (整合所有 artifacts) | [reports/2026-04-26_lnw_paper_section4_summary.md](reports/2026-04-26_lnw_paper_section4_summary.md) |
 | 2026-04-27 | BLN consumption env MVP (3rd env, endogenous reference + ternary action; iter_states bug #5) | [reports/2026-04-27_bln_env_mvp.md](reports/2026-04-27_bln_env_mvp.md) |
+| 2026-04-27 | Refactor ↔ L-原 native 一致性确认 (CPT88/p=0.66/filter=0.9, 10 seeds, 0.5σ 内) | [reports/2026-04-27_refactor_vs_legacy_p066.md](reports/2026-04-27_refactor_vs_legacy_p066.md) |
+| 2026-04-27 (rev 04-28) | Paper Tables 1/2 全 10 cells SPERL 复现 (refactor, 10 seeds, per-cell filter): Opt 9/10, SW 6/10 在 1σ 内. v1 paper 数字 hardcode 错误已修正 | [reports/2026-04-27_paper_tables_1_2_full_sweep.md](reports/2026-04-27_paper_tables_1_2_full_sweep.md) |
