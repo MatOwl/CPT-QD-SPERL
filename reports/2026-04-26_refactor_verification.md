@@ -1,5 +1,11 @@
 # 2026-04-26 — Refactor verification Phase A: legacy vs generic unit isolation
 
+> ⚠️ **2026-04-27 caveat**：本 report Phase C 引用的 "L-仿" 数字（exec-slice 抽出 legacy class 后用我的 wrapper 驱动）已证实在 ~19% near-tie state 上 fp-flip ≠ L-原 native（即 `agents/rerun_GreedySPERL_QR__main.py` 自己的 runner block 跑出的结果）。见 [HANDOFF L-仿 = L-原 row]。
+>
+> Phase A/B 的 unit-level 对比仍然有效（不依赖 L-仿 driver），但 Phase C "Generic 1.46 vs Legacy -0.89" 中的 -0.89 是 L-仿 数字，待 L-原 native 在同 config 下重测后更新。
+>
+> L-仿 driver scripts 已于 2026-04-27 删除（`scripts/legacy_extract.py` / `scripts/run_legacy_one_seed.py` / `scripts/run_legacy_multiseeds.py` / `scripts/legacy_compat_stubs.py`），未来用 [`scripts/run_legacy_native.py`](../scripts/run_legacy_native.py) 直接跑 L-原。
+
 ## 任务
 
 User reframe: "用 Barberis casino 这个 environment 确认目前的 refactor 有没有问题"。

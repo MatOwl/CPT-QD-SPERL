@@ -285,13 +285,13 @@ class CPTCritic():
                 # for t < 4, qtileTargets are TD targets --> they can be 0 at first visit!
                 # The above holds even with backward updates, since OPPONENT_ACTION will determine the targets for t
                 
-                for i in range(self.support_size): # 1-1 <= i <= self.support_size-1 
+                for i in range(self.support_size): # 1-1 <= i <= self.support_size-1
                     cur_qtile_estimate = self.qtilepredict(state, action, i, is_even)
-                    
+
                     tau_i = compute_cdf(i, self.support_size, pos = False) # = i/I
                     tau_i_next = compute_cdf(i+1, self.support_size, pos = False) # = (i+1)/I
-                    midpoint_i = (tau_i + tau_i_next) / 2 
-                    
+                    midpoint_i = (tau_i + tau_i_next) / 2
+
                     _, loc = barberisFeaturize(state)
                     lossgrad[loc, action, i] += np.sum([midpoint_i - (z < cur_qtile_estimate) for z in qtile_targets])
                     # i: updates tau_i + tau_i+1/2; i=0 -> (0/50+1/50) / 2
@@ -1053,7 +1053,7 @@ lbub = 1
 
 # K = 50
 #2I. reset CPTParams
-CPTParams = [(.95, .5, 1.5)] #[(.88, .65, 2.25)] #[(.95, .5, 1.5)] 
+CPTParams = [(.95, .5, 1.5)] #[(.88, .65, 2.25)] #[(.95, .5, 1.5)]
 pwinArr = [.36, .3, .42] #[.62, .59, .64] # [.36, .3, .42]
 
 # cpt=.95: .6, .63 wo filter/firstVisit alr decent (prob bias 0)
@@ -1294,8 +1294,8 @@ for alpha, rho1, lmbd in CPTParams:
                         actor_timescale = 1
                         train_num = 300*50 # change default, if n_batch is changed to 1 from 50; @BFS20: use 200*50
                         n_train_eps = train_num * (2*n_batch) * actor_timescale
-                        n_eval_eps = 500
-                        eval_freq = 2*n_batch *50 # change default, if n_batch is changed to 1 from 50
+                        n_eval_eps = 100   # S2 speedup: 500 -> 100 (5x per-eval); affects monitoring only
+                        eval_freq = 2*n_batch *1500 # S1 speedup: factor 50 -> 1500 (15x fewer evals); was 100, now 3000
                         
                         # Default = (.1, 1.) -- changed for learning curve demo [cf. Debug0]
                         THETA_MIN = .1

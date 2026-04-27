@@ -11,7 +11,7 @@
 | Refactor 引入的 3 个语义 bug | ✅ 已修 (cpt_offset hook + featurizer/SPE 修补) |
 | Refactor pure-fn 一致性 (Phase A unit isolation) | ✅ compute_CPT 100% ≡ legacy；filter ⚠️ paper-pseudocode-faithful（legacy 偏离 paper 文字）；env ✓ |
 | Refactor critic update 一致性 (Phase B unit isolation) | ✅ first-visit ≡；QR grad ≡ legacy 用向量化版后 bit-exact；当前 generic 比 legacy fp 更精确 |
-| Refactor e2e 一致性 (Phase C 10-seed legacy aggregate) | ✅ Generic 比 legacy **显著好** (Opt 1.46 vs -0.89; disagree 5.3 vs 12.2 / 15) — 不是 regression，是 improvement |
+| Refactor e2e 一致性 (Phase C 10-seed legacy aggregate) | ⚠️ Phase C 用的 "L-仿" driver 在 ~19% near-tie state 上 fp-flip ≠ L-原 native；-0.89 数字需用 L-原 native 重测 |
 | Paper Tables 数字源于 legacy？| ❌ legacy 自己都跑不出 paper 2.74，paper 用的不是这份代码 |
 | Welfare 求和域 vs paper Definition 5 | ✅ 已对齐 (Barberis featurizer fix) |
 | Algorithm 3/4 port 到 generic path | ✅ 完成，默认 off, 向后兼容 |
