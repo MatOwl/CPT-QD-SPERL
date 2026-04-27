@@ -71,6 +71,16 @@ def rollout_cpt_from_state(
     return cpt_params.compute(list(rewards))
 
 
+def _is_bln(env) -> bool:
+    """Duck-type check: BLN consumption env has gamma + n_W + n_R + reward_scale."""
+    return (
+        hasattr(env, "gamma")
+        and hasattr(env, "n_W")
+        and hasattr(env, "n_R")
+        and hasattr(env, "reward_scale")
+    )
+
+
 def _is_abandonment(env) -> bool:
     """Duck-type check: LNW abandonment env has delta + c + x1 attributes."""
     return (
@@ -82,12 +92,20 @@ def _is_abandonment(env) -> bool:
 
 
 def _is_barberis(env) -> bool:
-    """Duck-type check: Barberis casino has bet + T but no LNW-specific attrs."""
-    return hasattr(env, "bet") and hasattr(env, "T") and not _is_abandonment(env)
+    """Duck-type check: Barberis casino has bet + T but no LNW/BLN-specific attrs."""
+    return (
+        hasattr(env, "bet")
+        and hasattr(env, "T")
+        and not _is_abandonment(env)
+        and not _is_bln(env)
+    )
 
 
 def _state_time(state, env):
     """Extract the current time-step from an env state for different envs."""
+    # BLN: state = (t, W_idx, R_idx); time at index 0.
+    if _is_bln(env) and len(state) == 3:
+        return int(state[0])
     # Barberis: state = (t, z); LNW: state = (t, x_idx). Both have t at index 0.
     if (_is_barberis(env) or _is_abandonment(env)) and len(state) == 2:
         return int(state[0])
@@ -111,12 +129,23 @@ def abandonment_reset_kwargs(init_state):
     return {"init_time": int(t), "init_x_idx": int(x_idx)}
 
 
+def bln_reset_kwargs(init_state):
+    t, w_idx, r_idx = init_state
+    return {
+        "init_time": int(t),
+        "init_W_idx": int(w_idx),
+        "init_R_idx": int(r_idx),
+    }
+
+
 def optex_reset_kwargs(init_state):
     return {"init_state": tuple(int(v) for v in init_state)}
 
 
 def reset_kwargs_builder(env):
     """Return the appropriate reset-kwargs builder for ``env``."""
+    if _is_bln(env):
+        return bln_reset_kwargs
     if _is_abandonment(env):
         return abandonment_reset_kwargs
     if _is_barberis(env):
@@ -144,6 +173,9 @@ def abandonment_initial_offset_builder(env):
 def initial_offset_builder(env):
     """Return the env-specific initial-offset function (None for envs where
     the MDP reward's running sum is already the CPT-relevant quantity)."""
+    if _is_bln(env):
+        # BLN: r_t = c_t - R_t already centered on reference, no offset needed.
+        return None
     if _is_abandonment(env):
         return abandonment_initial_offset_builder(env)
     if _is_barberis(env):
@@ -255,6 +287,8 @@ def compute_paper_metrics(
 
 def _to_obs(x, env):
     """Convert a state tuple back to the observation format env expects."""
+    if _is_bln(env) and len(x) == 3:
+        return np.array([x[0], x[1], x[2]], dtype=np.float32)
     if (_is_barberis(env) or _is_abandonment(env)) and len(x) == 2:
         return np.array([x[0], x[1]], dtype=np.float32)
     return np.asarray(x, dtype=np.intc)

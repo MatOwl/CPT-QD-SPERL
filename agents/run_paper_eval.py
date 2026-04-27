@@ -64,6 +64,20 @@ def build_env(name, args):
             T=args.horizon,
             x1=args.x1,
         )
+    if name == "bln":
+        return make_env(
+            name,
+            T=args.horizon,
+            n_W=args.n_W,
+            n_R=args.n_R,
+            gamma=args.gamma,
+            delta_c=args.delta_c,
+            pi_fixed=args.pi_fixed,
+            mu=args.mu_stock,
+            sigma=args.sigma_stock,
+            r=args.r_free,
+            reward_scale=args.reward_scale,
+        )
     raise ValueError(name)
 
 
@@ -89,6 +103,15 @@ def get_reference_policy(args, env):
     if args.env == "abandonment":
         from lib.envs.abandonment_spe import compute_spe_policy, spe_policy_fn
         print(f"[ref] solving LNW abandonment SPE via backward induction "
+              f"(n_eval_eps={args.spe_rollouts})")
+        spe_dict = compute_spe_policy(
+            env, CPTParams(args.alpha, args.rho1, args.rho2, args.lmbd),
+            n_eval_eps=args.spe_rollouts,
+        )
+        return spe_policy_fn(spe_dict)
+    if args.env == "bln":
+        from lib.envs.bln_spe import compute_spe_policy, spe_policy_fn
+        print(f"[ref] solving BLN consumption SPE via backward induction "
               f"(n_eval_eps={args.spe_rollouts})")
         spe_dict = compute_spe_policy(
             env, CPTParams(args.alpha, args.rho1, args.rho2, args.lmbd),
@@ -134,6 +157,27 @@ def main():
                         help="[abandonment] continuation cost per step")
     parser.add_argument("--x1", type=int, default=50,
                         help="[abandonment] initial project value")
+
+    # bln-specific
+    parser.add_argument("--n-W", type=int, default=10,
+                        help="[bln] # wealth bins (log-spaced grid)")
+    parser.add_argument("--n-R", type=int, default=6,
+                        help="[bln] # reference bins (linear grid)")
+    parser.add_argument("--gamma", type=float, default=0.3,
+                        help="[bln] reference EWMA persistence (0=constant)")
+    parser.add_argument("--delta-c", type=float, default=0.25,
+                        help="[bln] consumption Δ per step (c=R*(1+aΔ))")
+    parser.add_argument("--pi-fixed", type=float, default=0.5,
+                        help="[bln] fixed risky-asset fraction (no decision)")
+    parser.add_argument("--mu-stock", type=float, default=0.05,
+                        help="[bln] log-stock-return mean (annual)")
+    parser.add_argument("--sigma-stock", type=float, default=0.20,
+                        help="[bln] log-stock-return vol (annual)")
+    parser.add_argument("--r-free", type=float, default=0.01,
+                        help="[bln] risk-free annual rate")
+    parser.add_argument("--reward-scale", type=float, default=100.0,
+                        help="[bln] multiplier on per-step reward (c-R)*scale "
+                             "for hyperparam compatibility with Barberis")
 
     # eval
     parser.add_argument("--eval-per-state", type=int, default=100,

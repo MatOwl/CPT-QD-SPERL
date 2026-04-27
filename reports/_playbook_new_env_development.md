@@ -318,6 +318,18 @@ $PYTHON agents/run_paper_eval.py --env <new_env> --seeds 3 \
 
 **怎么避免**: 加新 env 时验证 SPSA 在该 env 上 cpt_rewards 的初始 evaluation 跟 SPE oracle 在 (0,0) 的 V_hat 接近 (warm-start at SPE 应该给 ≈ V_hat)。
 
+### Bug #5: iter_states ⊋ reachable set (BLN 暴露)
+
+**症状**: SPERL 训练正常, 在 x_0 critic 学对了 (`agent.policy.greedy_action[loc(x_0)] == a_spe`), 但 paper-eval Disagree 高得离谱 (70-90%)。检查发现 SPERL 在 x_0 之外的多数 state 选 default action (action 0)。
+
+**原因**: `iter_states` yield 了不可达 states, SPERL 训练永远不访问这些 cell, critic 是 init 值, default argmax 给假性 disagreement。
+
+**修复**: `iter_states` 改 BFS 找 reachable-from-x_0 set。BLN 实施见 [`lib/envs/featurizers.py`](../lib/envs/featurizers.py) `BLNFeaturizer.iter_states(env)` (类比 OptExFeaturizer.iter_states 的 OptExTree)。
+
+**Barberis/LNW 不踩坑的原因**: parity-correct 网格 (x_idx 跟 t 同 parity) 在 random-walk + 离散动作下**恰好** = reachable set。这是巧合, 不是普适。Stochastic-snap env (BLN) 或 BFS-tree env (OptEx) 都必须显式 BFS。
+
+**怎么避免**: 写完 env + featurizer 后, 在 SPERL 第一次训练时 trace visited-state 集合, 跟 `iter_states()` 输出对比。如果 visited ⊊ iter_states, 改 iter_states 为 reachable 子集。**默认假设**: 任何 state-discretization 涉及 snap-to-grid 或非 deterministic-parity 的 env, 都要 BFS, 不能默认全网格。
+
 ---
 
 ## 附录 B — 超参移植启发

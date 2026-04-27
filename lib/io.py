@@ -40,6 +40,11 @@ def run_name_from_args(args, env):
         parts.append(
             f"T{args.horizon}_x1{args.x1}_c{args.c}_d{args.delta}_p{args.p_win}"
         )
+    elif env == "bln":
+        parts.append(
+            f"T{args.horizon}_nW{args.n_W}_nR{args.n_R}"
+            f"_g{args.gamma}_dc{args.delta_c}"
+        )
     parts.append(f"cpt_a{args.alpha}_r{args.rho1}_l{args.lmbd}")
     return "_".join(str(p) for p in parts)
 

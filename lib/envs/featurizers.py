@@ -117,6 +117,88 @@ class AbandonmentFeaturizer(Featurizer):
                 yield (t, k)
 
 
+class BLNFeaturizer(Featurizer):
+    """BLN consumption: obs = (t, W_idx, R_idx).
+
+    Unlike Barberis/LNW where a parity argument identifies the reachable set
+    exactly, BLN's grid-snapping over stochastic dynamics makes only a SUBSET
+    of (t, W_idx, R_idx) cells reachable from x_0 — exactly which depends on
+    discretisation, γ, and stock-return support. ``iter_states`` does a forward
+    BFS from x_0 over (action × stock-outcome) transitions to enumerate the
+    reachable decision states; this matches how OptExFeaturizer does it (via
+    OptExTree) and ensures paper-eval metrics measure on-path disagreement
+    only (off-path states are not observed by the trained critic).
+
+    ``cpt_offset = 0`` because the per-step reward ``r_t = c_t − R_t`` is
+    already centered on the reference (cumulative Σr is directly the CPT
+    input — no terminal-wealth offset needed).
+    """
+
+    def __init__(self, env):
+        self.T = env.T
+        self.n_W = env.n_W
+        self.n_R = env.n_R
+        self.n_states = (self.T + 1) * self.n_W * self.n_R
+
+    def loc(self, obs) -> int:
+        t, w_idx, r_idx = int(obs[0]), int(obs[1]), int(obs[2])
+        return self.n_W * self.n_R * t + self.n_R * w_idx + r_idx
+
+    def key(self, obs):
+        t, w_idx, r_idx = obs[0], obs[1], obs[2]
+        return (int(t), int(w_idx), int(r_idx))
+
+    def cpt_offset(self, obs) -> float:
+        return 0.0
+
+    def iter_states(self, env=None):
+        """Reachable decision states (t < T) via forward BFS from x_0.
+
+        Each cell expands to 3 actions × 2 stock outcomes = 6 successors.
+        Discretisation collapses many of these to the same bin so the reachable
+        set is much smaller than (T × n_W × n_R) in practice.
+        """
+        if env is None:
+            raise ValueError("BLNFeaturizer.iter_states needs the env instance.")
+
+        x_0 = (0, env.W_init_idx, env.R_init_idx)
+        visited = set()
+        frontier = [x_0]
+        while frontier:
+            s = frontier.pop()
+            if s in visited:
+                continue
+            visited.add(s)
+            t, w_idx, r_idx = s
+            if t >= env.T:
+                continue
+            W = float(env.W_grid[w_idx])
+            R = float(env.R_grid[r_idx])
+            for a in range(env.action_space.n):
+                if a == 0:
+                    c_factor = 1.0 - env.delta_c
+                elif a == 1:
+                    c_factor = 1.0
+                else:
+                    c_factor = 1.0 + env.delta_c
+                c = max(min(R * c_factor, W * 0.99), 0.0)
+                for R_stock in (env.R_up, env.R_down):
+                    pr = env.pi_fixed * R_stock + (1.0 - env.pi_fixed) * (1.0 + env.r)
+                    W_next = (W - c) * pr
+                    R_next = (1.0 - env.gamma) * R + env.gamma * c
+                    next_s = (
+                        t + 1,
+                        env._snap_W(W_next),
+                        env._snap_R(R_next),
+                    )
+                    if next_s not in visited:
+                        frontier.append(next_s)
+
+        for s in sorted(visited):
+            if s[0] < self.T:
+                yield s
+
+
 class OptExFeaturizer(Featurizer):
     """Optimal execution: obs = (logRet_bin, remain_bin, X_bin).
 
