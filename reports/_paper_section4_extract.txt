@@ -1,0 +1,182 @@
+===== PAGE 23 =====
+Authors’ names not included for peer review
+Article submitted to Management Science 23
+Figure 3 Comparing SPERL with SPE in CPT95 ( 𝑝𝑤𝑖𝑛 = .6).
+(a) Policy
+(b) Value
+Note. 𝑥-axis indicates the time-embedded states, while 𝑦-axis presents the mean and standard deviation of policy and value
+functions for SPERL and SPE across 10 seeds.
+4.1. Equilibrium Learning and Approximation
+We empirically assess the performance of CPT QDRL method in approximating equilibrium from
+two aspects: policy and value. We denote the approximate equilibrium (termed SPERL) learned by
+CPT QDRL and the benchmark true equilibrium (termed SPE) by ˜𝝅 and ˆ𝝅, respectively. We define
+two learning metrics,
+1. Policy Error 𝑚𝑒𝑎𝑛 = Í
+𝑥 |𝜇 [ ˜𝜋(𝑥)] − 𝜇 [ ˆ𝜋(𝑥)] | and 𝑠𝑡𝑑𝑒𝑣 = 1
+|X|
+Í
+𝑥 𝜎 [ ˆ𝜋(𝑥)]
+2. Value Error 𝑚𝑒𝑎𝑛 = Í
+𝑥
+𝜇
+
+𝑉 ˜𝝅 (𝑥)
+
+− 𝜇
+
+𝑉 ˆ𝝅 (𝑥)
+ and 𝑠𝑡𝑑𝑒𝑣 = 1
+|X|
+Í
+𝑥 𝜎
+
+𝑉 ˆ𝝅 (𝑥)
+
+Details on the algorithm and implementations can be found in Appendix C.2.
+Figures 3 and 4 present the good and bad examples of SPERL (in blue) 1. We can see that
+SPERL matches SPE (in black) in almost all states in Figure 3 while incurring erroneous policies
+in quite a few states in Figure 4. To explain the latter errors, note that unmatched policies do not
+necessarily imply unmatched values. In a similar vein, our policy errors originate from the states
+with a relatively small gap between action values, which then propagates to other states and only
+then possibly widens value gaps (in these other states); see Appendix C.4.2 for a detailed discussion.
+4.2. Control Properties
+To evaluate the control properties of SPERL, we refer back to the TIC-aware control objectives in
+Section 2.2.2 while we identify additional benchmark policies:
+1 We run CPT QDRL and compute SPE in different CPT-MDP setups, where 𝑝𝑤𝑖𝑛 ∈ [ .48, .72]. In particular, the good (resp. bad)
+example here refers to the lowest (resp. highest) policy error mean among the highlighted results in Table 3, Appendix C.4.
+
+===== PAGE 24 =====
+Authors’ names not included for peer review
+24 Article submitted to Management Science
+Figure 4 Comparing SPERL with SPE in CPT88 ( 𝑝𝑤𝑖𝑛 = .66).
+(a) Policy
+(b) Value
+Note. 𝑥-axis indicates the time-embedded states, while 𝑦-axis presents the mean and standard deviation of policy and value
+functions for SPERL and SPE across 10 seeds.
+1. Loss-Exit (green), a surrogate global optimum in TIC setups (see Appendix C.3.2).
+2. Gain-Exit (orange), a surrogate dynamic optimum in TIC setups (see Appendix C.3.3).
+3. SPSA (red), an RL-based approximation to the globally-optimal policy Prashanth et al. (2016)
+(see Appendix C.3.4).
+We will leverage two main metrics to organize our discussion,
+1. Optimality 𝑚𝑒𝑎𝑛 = 𝜇 [𝑉 𝝅 (𝑥0)] and 𝑠𝑡𝑑𝑒𝑣 = 𝜎 [𝑉 𝝅 (𝑥0)]
+2. Social Welfare 𝑚𝑒𝑎𝑛 = 𝜇 [Í
+𝑥 𝑉 𝝅 (𝑥)] and 𝑠𝑡𝑑𝑒𝑣 = 𝜎 [Í
+𝑥 𝑉 𝝅 (𝑥)]
+Recall from Sections 2.2.2-2.2.3 that both optimality (as a standard measure of performance) and
+social welfare (as a measure of TCness) are equally important in the presence of TIC; the higher
+the mean of these measures, the better. Note however that these two measures may have conflicting
+forces on the ordering of our evaluated policies as we further discuss in this section.
+4.2.1. Optimality and Social Welfare Table 1 (resp. 2) presents the optimality (resp. social
+welfare) 𝑚𝑒𝑎𝑛 𝑠𝑡𝑑𝑒𝑣 of all policies in different CPT-MDP setups (by rows). To expand on these
+tables, we will focus on means (marked ‘∗’) and plot the policies’ optimality against their welfare in
+Figures 5 (CPT95) and 6 (CPT88). Several patterns can be gleaned from these tables and figures.
+First, we observe that in both CPT88 and CPT95, SPERL as an approximate SPE trails SPE
+very closely; the furthest distance is realized in Figure 6(b), which corresponds to the bad learning
+example from Figure 4.
+Next, let us focus on CPT95 results. We observe SPE/RL and Gain-Exit tend to dominate the rest
+in welfare, as expected from their TCness by construction (see Section 2.2.2). In terms of optimality,
+
+===== PAGE 25 =====
+Authors’ names not included for peer review
+Article submitted to Management Science 25
+Table 1 Optimality ( 𝑚𝑒𝑎𝑛 𝑠𝑡 𝑑𝑒𝑣 ) across policies.
+Policies
+SPERL (ours) SPE SPSA Loss-Exit Gain-Exit
+CPT88
+7.91.64† 8.07.39∗ 4..45 6.09.18† 1.07.28 .72
+𝑝𝑤𝑖𝑛
+2.74.95 3.59.3∗ 1.15.46 3.41.21† −1.67.43 .66
+0.0.† 0.0. −.18.07 .86.17†∗ −4.59.37 .6
+0.0.†∗ 0.0.∗ −.43.06 −1.49.22 −7.9.23 .54
+0.0.†∗ 0.0.∗ −.68.05 −3.77.21 −11.24.37 .48
+CPT95
+−.03.33 0.0. 5.54.28 9.18.12†∗ −.24.32 .72
+0.0.† 0.0. 3.88.17 7.3.14†∗ −2.74.39 .66
+0.0.† 0.0. 2.35.5 5.52.13†∗ −5.03.3 .6
+0.0.† 0.0. .64.41 3.84.15†∗ −7.33.18 .54
+0.0.† 0.0. −.09.04 2.13.18†∗ −9.45.24 .48
+Note. In each row, the Pareto-optimal policies when mean and stdev acting as objectives
+are highlighted in blue; the mark ‘∗’ refers to the policy with the highest optimality mean,
+while the mark ‘†’ refers to the Pareto-optima after removing SPE.
+Table 2 Social welfare ( 𝑚𝑒𝑎𝑛 𝑠𝑡 𝑑𝑒𝑣 ) across policies.
+Policies
+SPERL (ours) SPE SPSA Loss-Exit Gain-Exit
+CPT88
+−26.033.63† −24.151.21∗ −67.895.24 −89.3.45† −52.261.02† .72
+𝑝𝑤𝑖𝑛
+−59.942.88† −51.51.06∗ −88.564.42 −103.28.56† −71.03.89† .66
+−80.094.22† −79.28.67∗ −103.061.99 −116.6.5† −90.21.17† .6
+−91.492.93† −90.93.74∗ −112.732.84 −129.49.59† −109.43.92† .54
+−104.412.13† −100.81.52∗ −119.963.21 −141.96†
+.59 −129.33†
+1.05 .48
+CPT95
+−7.313.32 −4.03.28 −28.535.83 −37.24.38 −3.95.72†∗ .72
+−17.561.2 −16.83.48 −42.3.13 −48.54.45 −16.45.56†∗ .66
+−23.671.04† −23.48.41∗ −51.012.24 −58.83.37† −28.55.73† .6
+−30.36.99† −29.86.32∗ −59.431.8 −68.48.43† −40.28.53† .54
+−35.612.37† −34.92.31∗ −65.421.91 −77.7.44† −52.18.65† .48
+Note. In each row, the Pareto-optimal policies when mean and stdev acting as objectives are highlighted
+in blue; the mark ‘∗’ refers to the policy with the highest social welfare mean, while the mark ‘†’ refers to
+the Pareto-optima after removing SPE.
+SPE/RL tends to be better positioned than Gain-Exit, suggesting Gain-Exit’s failure to balance the
+trade-off by sacrificing too much optimality. On the contrary, SPSA and Loss-Exit tend to dominate
+in optimality, as natural from their association with global optimality; the relatively bad welfare
+of these policies displays the inherent trade-off between 𝑥0’s value and the remaining states, as
+characteristic of TIC. In terms of welfare, SPSA is better positioned than Loss-Exit, suggesting the
+usefulness of stochasticity in improving TCness at the cost of optimality (as focus to𝑥0 is reduced).
+Now, let us move on to CPT88 results. We observe that in almost all figures, SPE/RL dominates
+the remaining policies in both optimality and welfare. While there is clear domination by SPE/RL
+in TCness, these figures suggest SPE/RL ’s comparative optimality with SPSA and Loss-Exit. One
+important thing to note is that unlike in CPT95, it is now possible to attain both the best welfare
+and optimality, suggesting the lower degree of conflict between 𝑥0 and the other states (that is
+
+===== PAGE 26 =====
+Authors’ names not included for peer review
+26 Article submitted to Management Science
+Figure 5 Optimality and social welfare trade-off in CPT95.
+(a) 𝑝𝑤𝑖𝑛 = .72
+ (b) 𝑝𝑤𝑖𝑛 = .66
+ (c) 𝑝𝑤𝑖𝑛 = .6
+(d) 𝑝𝑤𝑖𝑛 = .54
+ (e) 𝑝𝑤𝑖𝑛 = .48
+characteristic of TC). We thus argue that CPT88, unlike CPT95, forms TC or near-TC setups. To
+corroborate this argument, recall that in TC setups, SPE provably attains the global optimum. The
+near-TCness of CPT88 can help explain SPE/RL ’s competitive optimality with the global optimum
+surrogates Loss-Exit and SPSA.
+4.2.2. Social Welfare and Robustness in Optimality In Section 2.2.2, we have discussed
+some imagined undesirability of globally optimal policies, where the optimality of each action
+relies on all future actions being executed as initially planned. We have argued that there might
+be scenarios that call for a change in future actions, in which case, globally optimal policies will
+degrade in optimality. This section attempts to make precise this statement, by showing that there
+are indeed such scenarios where globally-optimal policies degrade. To make such results more
+meaningful, we will show that alternative policies such as SPE/RL might alleviate such optimality
+degradation.
+To this end, we will expand on our understanding of social welfare, particularly how its maxi-
+mization is distinct from optimality maximization in a multi-period decision-making context. First,
+recall from the last section that the meaning of welfare differs by the TIC extent of a given CPT-MDP
+
+===== PAGE 27 =====
+Authors’ names not included for peer review
+Article submitted to Management Science 27
+Figure 6 Optimality and social welfare trade-off in CPT88.
+(a) 𝑝𝑤𝑖𝑛 = .72
+ (b) 𝑝𝑤𝑖𝑛 = .66
+ (c) 𝑝𝑤𝑖𝑛 = .6
+(d) 𝑝𝑤𝑖𝑛 = .54
+ (e) 𝑝𝑤𝑖𝑛 = .48
+setup. In TIC setups, if a policy attains high welfare, then it must have placed less focus on 𝑥0 that
+is in direct conflict with other states 𝑥 ∈ X \ {𝑥0}. We can imagine such distributed focus, as it lifts
+the assumption that other states will cooperate and sacrifice themselves for𝑥0, to help de-correlate
+the value of taking an action at one time to the follow-up sequence of actions. On the contrary, in
+TC and near-TC setups, attaining high welfare implies attaining high (or close to high) optimality.
+To achieve the specified objectives of our robustness study, we need to design realistic perturbation
+scenarios where the high welfare of SPE/RL might lead to higher optimality (relative to Loss-Exit
+and SPSA) post-perturbation. Since TC setups do not distinguish high welfare from high optimality,
+we focus on the TIC setup CPT95 (recall Figure 5(c)). We dis-aggregate welfare by considering
+the values of all policies at all states in Figure 7. We observe that the high welfare of SPE/RL can
+be attributed to the states 𝑥 ≠ 𝑥0, in which SPE/RL dominate Loss-Exit or SPSA, which may have
+less contribution to 𝑥0’s value in our specific MDP setup (with 𝑝𝑤𝑖𝑛 = .6). To see this, note how
+the welfare contributors tend to reside in the loss regions 𝑥 < 0, which by 𝑝𝑤𝑖𝑛 > .5 should be less
+visited and thus, contribute less to the value of 𝑥0. From here, we deduce two intuitions to perturb
+our MDP such that welfare contributors also contribute to 𝑥0’s value:
