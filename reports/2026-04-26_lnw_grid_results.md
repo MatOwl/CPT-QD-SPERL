@@ -82,7 +82,7 @@ Disagree count 也增 (1.2 → 1.0, 但 |X| 翻倍, 比例 8% → 4%) — agent 
 ## Artifacts
 
 ```
-results/
+runs/
   abandonment_sperl_T5_x150_c11_d10_p0.6_cpt_a0.88_r0.65_l2.25/    # T=5 p=0.6 CPT88
   abandonment_sperl_T5_x150_c11_d10_p0.6_cpt_a0.95_r0.5_l1.5/      # T=5 p=0.6 CPT95
   abandonment_sperl_T5_x150_c11_d10_p0.72_cpt_a0.88_r0.65_l2.25/   # T=5 p=0.72 CPT88 (production)

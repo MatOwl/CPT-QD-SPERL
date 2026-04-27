@@ -15,7 +15,7 @@ Usage:
 
 Example:
     python scripts/analyze_lnw.py \
-        results/abandonment_sperl_T5_x150_c11_d10_p0.72_cpt_a0.88_r0.65_l2.25
+        runs/abandonment_sperl_T5_x150_c11_d10_p0.72_cpt_a0.88_r0.65_l2.25
 """
 from __future__ import annotations
 
@@ -231,7 +231,7 @@ def plot_v_scatter(run_dir: Path, dfs: list[pd.DataFrame], config: dict):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("run_dir", type=Path,
-                   help="Path to results/abandonment_sperl_T*_*/ directory")
+                   help="Path to runs/abandonment_sperl_T*_*/ directory")
     args = p.parse_args()
 
     if not args.run_dir.is_dir():

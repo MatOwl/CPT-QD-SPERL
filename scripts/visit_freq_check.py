@@ -53,7 +53,7 @@ def main():
     ap.add_argument("--horizon", type=int, default=5)
     ap.add_argument("--spe-file", default="CumSPERL_ref/SPE_OptEx_5_0.015_4.npy")
     ap.add_argument("--results-dir",
-                    default="results_alg34_optex/optex_sperl_sig0.015_numw4_cpt_a0.95_r0.5_l1.5",
+                    default="runs/results_alg34_optex/optex_sperl_sig0.015_numw4_cpt_a0.95_r0.5_l1.5",
                     help="dir containing seedN/per_state_values.csv (sticky+filter run)")
     ap.add_argument("--n-traj", type=int, default=2000)
     args = ap.parse_args()

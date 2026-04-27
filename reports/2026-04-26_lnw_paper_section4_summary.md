@@ -81,7 +81,7 @@ Comparable to Barberis CPT88/p=0.72 control (disagree 1.3, optimality 7.6).
 ### Per-state Policy Heatmap (paper Figure 5 type)
 [scripts/analyze_lnw.py](../scripts/analyze_lnw.py) 生成 3-panel figure: SPE oracle | SPERL learned | Disagreement count.
 
-3 个 representative configs 的 PNG 已生成在对应 `results/abandonment_*/policy_heatmap.png`:
+3 个 representative configs 的 PNG 已生成在对应 `runs/abandonment_*/policy_heatmap.png`:
 - T=5 p=0.72 CPT88 (headline): 显示 fan-out threshold, abandon at (3,-3), (4,-4)
 - T=5 p=0.6 CPT88 (stay-out): 显示 "abandon ladder" 沿 (0,0)-(1,-1)-(2,-2)-(3,-3)-(4,-4) 对角线
 - T=7 p=0.72 CPT88 (large horizon): fan-out 干净 scale 到 28 states

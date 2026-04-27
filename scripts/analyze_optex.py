@@ -16,7 +16,7 @@ Usage:
     python scripts/analyze_optex.py <results_dir> [--n-traj 2000]
 
 where <results_dir> points at e.g.
-  results_optex/optex_sperl_sig0.015_numw4_cpt_a0.95_r0.5_l1.5
+  runs/results_optex/optex_sperl_sig0.015_numw4_cpt_a0.95_r0.5_l1.5
 """
 from __future__ import annotations
 

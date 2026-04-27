@@ -48,17 +48,17 @@ def summarize(name, paths, col):
         print(f"{cfg:<24} {sa:>10.2f} {srt:>14.2f} {sr:>18.2f}")
 
 paths = [
-    ("baseline_off", "results_alg34_off"),
-    ("sticky_only", "results_alg34_stickyonly"),
-    ("filter_only", "results_alg34_filteronly"),
-    ("sticky+filter", "results_alg34"),
+    ("baseline_off", "runs/results_alg34_off"),
+    ("sticky_only", "runs/results_alg34_stickyonly"),
+    ("filter_only", "runs/results_alg34_filteronly"),
+    ("sticky+filter", "runs/results_alg34"),
 ]
 
 summarize("SPERL policy V_tilde", paths, "v_tilde")
 summarize("SPE oracle V_hat", [paths[0]], "v_hat")
 
 # Show state counts under each filter
-df0 = pd.read_csv("results_alg34_off/barberis_sperl_p0.72_cpt_a0.88_r0.65_l2.25/seed0/per_state_values.csv")
+df0 = pd.read_csv("runs/results_alg34_off/barberis_sperl_p0.72_cpt_a0.88_r0.65_l2.25/seed0/per_state_values.csv")
 df0["s"] = df0["state"].apply(ast.literal_eval)
 print(f"\nstate counts: all={len(df0)}, reach+term={df0['s'].apply(reachable_with_term).sum()}, reach_no_term={df0['s'].apply(reachable_no_term).sum()}")
 print("\npaper CPT88/p=0.72: SPE Welfare = -24.15 +/- 1.21")
