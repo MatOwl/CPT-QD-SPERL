@@ -1,7 +1,7 @@
 """LNW SPERL convergence curve generator.
 
 Trains GreedySPERL on LNW with frequent eval and plots CPT(x_0) trajectories
-across seeds. Output: results/<run>/convergence.png + convergence.npz.
+across seeds. Output: runs/<run>/convergence.png + convergence.npz.
 
 Plots two configs side-by-side:
   (a) Headline: T=5 p=0.72 CPT88 (SPE chooses continue at (0,0), V≈5)
@@ -91,7 +91,7 @@ def plot_curves(ax, curves, x, title: str, color="C0", spe_v: float = None):
 
 
 def main():
-    out_dir = Path("results/_lnw_convergence")
+    out_dir = Path("runs/_lnw_convergence")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     train_eps = 8000

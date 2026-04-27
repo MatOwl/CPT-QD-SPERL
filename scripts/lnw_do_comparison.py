@@ -173,7 +173,7 @@ def main():
     print(df.to_string(index=False))
 
     # Save
-    out_dir = Path("results/_lnw_do_comparison")
+    out_dir = Path("runs/_lnw_do_comparison")
     out_dir.mkdir(parents=True, exist_ok=True)
     df.to_csv(out_dir / "do_vs_spe.csv", index=False)
     print(f"\nSaved {out_dir / 'do_vs_spe.csv'}")

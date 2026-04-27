@@ -5,7 +5,7 @@
 # Usage:
 #   bash scripts/grid_lnw.sh
 #
-# Outputs go to results/abandonment_sperl_T*_x1*_c11_d10_p*_cpt_*/
+# Outputs go to runs/abandonment_sperl_T*_x1*_c11_d10_p*_cpt_*/
 
 set -e
 

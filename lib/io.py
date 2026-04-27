@@ -1,7 +1,7 @@
 """Lightweight persistence for runs of the generic framework.
 
-Directory layout:
-    results/{run_name}/
+Directory layout (default root: ``runs/``, set via ``--results-dir``):
+    runs/{run_name}/
         config.json                # all hyperparameters, for reproducibility
         seed{i}/
             stats.npz              # training curves (mean/std/cpt_rewards)

@@ -207,7 +207,7 @@ def main():
                              " = trust filter unconditionally.")
 
     # persistence
-    parser.add_argument("--results-dir", type=str, default="./results",
+    parser.add_argument("--results-dir", type=str, default="./runs",
                         help="root directory for saved artifacts")
     parser.add_argument("--no-save", action="store_true",
                         help="disable writing any files")
