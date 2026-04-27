@@ -1,6 +1,6 @@
 # 交接文档 — CPT-QD-SPERL paper 复现
 
-**最后更新**: 2026-04-26 (LNW abandonment env 实施完成，paper §4 deliverable 全套就位；Phase A+B+C refactor verification 完成在前)
+**最后更新**: 2026-04-27 (BLN consumption env MVP 实施完成；2026-04-26 之前: LNW abandonment env 实施完成，paper §4 deliverable 全套就位；Phase A+B+C refactor verification 完成在前)
 
 任务: 验证 refactor 后的 generic SPERL 是否和 paper (`paperRef/MSci_MANUSCRIPT.pdf`) 对得上。
 
@@ -31,8 +31,13 @@
 | **LNW 3-policy 对比 (SPE / DO / SPSA)** | ✅ stay-out config 上 V_DO=-4.14 vs V_SPE=0, SPSA collapse |
 | **LNW Algorithm 3/4 ablation** | ✅ best combo sticky+filter=0.9, LNW 不崩 (vs Barberis hardest 崩) |
 | **LNW per-state heatmap + convergence figure** | ✅ paper Figure 风格 PNG 生成 |
-| **新-env 开发 playbook 沉淀** | ✅ [reports/_playbook_new_env_development.md](reports/_playbook_new_env_development.md) |
+| **新-env 开发 playbook 沉淀** | ✅ [reports/_playbook_new_env_development.md](reports/_playbook_new_env_development.md) (含 5 个 bug pattern, BLN 加了 #5) |
 | 修补 SPSA + SPERL 的 cpt_offset latent bug (LNW 才暴露) | ✅ commit ad5bdbf + 8b6b27a |
+| **BLN consumption env MVP (van Bilsen-Laeven-Nijman 2020 MS, 第 3 个 env)** | ✅ env + SPE + featurizer + CLI, ternary action + fixed π=0.5, endogenous-reference 机制 |
+| **BLN MVP smoke test (5k eps × 3 seeds, 19.6s)** | ✅ Disagree 6/20 = 30% (BFS reachable set), SW gap 1.5/state ≈ Barberis 0.8/state |
+| **BLN BFS reachability fix (iter_states bug #5)** | ✅ 240 grid → 20 reachable; 一次 fix 把 SPERL Disagree 从 80% 降到 30% |
+| BLN Phase 5 deliverables (grid / DO / heatmap / convergence / Alg34) | ❌ 未做 (MVP scope 不含, 视后续展开) |
+| BLN salary / portfolio decision extension | ❌ MVP 不含 (paper §4 时声明 future work) |
 
 ## 关键概念
 
@@ -57,6 +62,9 @@ Packages: numpy==1.26.3 (gym 0.26 硬要求 <2), scipy, pandas, matplotlib, gym=
 | **LNW abandonment env** | [lib/envs/abandonment_project.py](lib/envs/abandonment_project.py) |
 | **LNW SPE backward induction** | [lib/envs/abandonment_spe.py](lib/envs/abandonment_spe.py) |
 | **LNW DO (EV-max) baseline** | [lib/envs/abandonment_do.py](lib/envs/abandonment_do.py) |
+| **BLN consumption env** | [lib/envs/bln_consumption.py](lib/envs/bln_consumption.py) |
+| **BLN SPE backward induction** | [lib/envs/bln_spe.py](lib/envs/bln_spe.py) |
+| **BLN featurizer + BFS reachable iter_states** | [lib/envs/featurizers.py](lib/envs/featurizers.py) `BLNFeaturizer` |
 | Algorithm 3 sticky tie-break | [agents/sperl_qr_generic.py](agents/sperl_qr_generic.py) `GreedyPolicy.update_from_critic_values` |
 | Algorithm 4 quantile filter | [agents/sperl_qr_generic.py](agents/sperl_qr_generic.py) `filter_quantiles` + `QRCritic._cpt_from_quantiles` |
 | Paper 4 metrics | [lib/paper_eval.py](lib/paper_eval.py) `compute_paper_metrics` |
@@ -83,9 +91,11 @@ Packages: numpy==1.26.3 (gym 0.26 硬要求 <2), scipy, pandas, matplotlib, gym=
 4. **写 paper §4.x LNW 章节** — 数据全有 ([reports/2026-04-26_lnw_paper_section4_summary.md](reports/2026-04-26_lnw_paper_section4_summary.md) 已 outline 章节结构), 直接 draft
 5. **LNW 10-seed re-run** — 当前 5 seeds 已稳定, paper 标准是 10
 6. **OptEx 自我 backward induction SPE oracle**
-7. **加另一个 env** (BLN consumption / Henderson liquidation) — 用 [reports/_playbook_new_env_development.md](reports/_playbook_new_env_development.md) 走流程
-8. ~~Phase B/C / filter 决策~~：✅ done (refactor verdict: faithful + improved)
-9. ~~LNW abandonment env 实施~~：✅ done (本 session, 9 commits afa0800..1c58019)
+7. **BLN Phase 5 deliverables** — 视 paper §4 narrative 需要展开 (grid / DO baseline / heatmap / convergence / Alg34 ablation; salary + portfolio extension)
+8. **加 Henderson liquidation env** — 第 4 个 env, 1D state + binary action, 用 playbook 走 (估 ~LNW 工作量)
+9. ~~Phase B/C / filter 决策~~：✅ done (refactor verdict: faithful + improved)
+10. ~~LNW abandonment env 实施~~：✅ done (2026-04-26 session, 9 commits afa0800..1c58019)
+11. ~~BLN consumption env MVP~~：✅ done (本 session, 1 commit 0dbcb72)
 
 详见各 session report。
 
@@ -104,3 +114,4 @@ Packages: numpy==1.26.3 (gym 0.26 硬要求 <2), scipy, pandas, matplotlib, gym=
 | 2026-04-26 | 新-env 开发方法论 playbook (5 phases + bug patterns + checklist) | [reports/_playbook_new_env_development.md](reports/_playbook_new_env_development.md) |
 | 2026-04-26 | LNW grid sweep 8 cells (T × p_win × CPT_regime) | [reports/2026-04-26_lnw_grid_results.md](reports/2026-04-26_lnw_grid_results.md) |
 | 2026-04-26 | LNW paper §4 deliverable summary (整合所有 artifacts) | [reports/2026-04-26_lnw_paper_section4_summary.md](reports/2026-04-26_lnw_paper_section4_summary.md) |
+| 2026-04-27 | BLN consumption env MVP (3rd env, endogenous reference + ternary action; iter_states bug #5) | [reports/2026-04-27_bln_env_mvp.md](reports/2026-04-27_bln_env_mvp.md) |
