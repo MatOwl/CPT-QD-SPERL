@@ -1,11 +1,19 @@
 """Re-aggregate paper §4.1 PE / VE σ on existing sweep data, without retraining.
 
-Why: the original `lib/io.py:_aggregate_paper_formula` took σ on (a_hat, v_hat)
-which under rebuilt-once-CRN gives ≈0 — wildly off paper Tables 3/4. Switching
-to (a_tilde, v_tilde) is correct per paper §4.1; this script rebuilds the
-`policy_error_paper` / `value_error_paper` entries in each cell's
-`aggregate.json` from the per-seed `per_state_values.csv` without the cost of a
-re-run.
+Paper §4.1 (tex:936-937) defines
+    σ_PE = (1/|X|) Σ_x σ_seeds[π̂(x)]
+    σ_VE = (1/|X|) Σ_x σ_seeds[V^π̂(x)]
+i.e. σ on the SPE oracle side (π̂, V̂). For these to be non-zero, the SPE
+oracle must be rebuilt with independent randomness per seed — handled in
+``agents/run_paper_eval.py`` (passes ``seed`` to ``compute_spe_policy``).
+
+Sweep data produced before that change has a cached-once oracle and gives
+σ ≈ 0. Re-running the relevant sweep is required to populate σ. This script
+just re-applies the formula on whatever per-seed data exists.
+
+(Earlier 2026-04-28 versions flipped σ to (a_tilde, v_tilde) as a workaround
+for the cached-oracle σ ≈ 0 — that "BUG #8 fix" was retracted on tex review;
+see ``reports/2026-04-28_tex_source_cross_check.md``.)
 
 Usage:
     PYTHONPATH=. python scripts/reaggregate_paper_std.py runs/results_paper_tables_3_4_v3
@@ -41,11 +49,11 @@ def _load_per_state(seed_dir: str):
 
 
 def _paper_aggregate(per_state_by_seed: list[list[dict]]) -> dict:
-    """Paper §4.1:
+    """Paper §4.1 (tex:936-937):
         PE μ = Σ_x | μ_seeds[π̃(x)] - μ_seeds[π̂(x)] |
         VE μ = Σ_x | μ_seeds[Ṽ(x)] - μ_seeds[V̂(x)] |
-        PE σ = (1/|X|) Σ_x σ_seeds[π̃(x)]
-        VE σ = (1/|X|) Σ_x σ_seeds[Ṽ(x)]
+        PE σ = (1/|X|) Σ_x σ_seeds[π̂(x)]   (on hat — SPE oracle)
+        VE σ = (1/|X|) Σ_x σ_seeds[V̂(x)]   (on hat — SPE oracle)
     """
     # Collect per-state arrays across seeds, joining by state-key string.
     state_keys = [r["state"] for r in per_state_by_seed[0]]
@@ -75,8 +83,8 @@ def _paper_aggregate(per_state_by_seed: list[list[dict]]) -> dict:
         v_hat = np.asarray(d["v_hat"], dtype=np.float64)
         pe_mean_terms.append(abs(a_tilde.mean() - a_hat.mean()))
         ve_mean_terms.append(abs(v_tilde.mean() - v_hat.mean()))
-        pe_std_terms.append(a_tilde.std())
-        ve_std_terms.append(v_tilde.std())
+        pe_std_terms.append(a_hat.std())
+        ve_std_terms.append(v_hat.std())
 
     n_x = len(pe_mean_terms)
     return {

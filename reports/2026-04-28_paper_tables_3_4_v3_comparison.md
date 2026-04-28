@@ -171,7 +171,17 @@ Paper §C.4 用 *-mark 标 (mean PE, std PE) 和 (mean VE, std VE) 二元 Pareto
 
 ---
 
-## ⚠️ Aggregator bug 修正 (BUG #7, 2026-04-28 后续)
+## ⚠️ 撤回 (2026-04-28 末段, tex 源码核对后)
+
+下方"Aggregator bug 修正 (BUG #7/#8)"小节里**关于 σ 应该取 (a_tilde, v_tilde)** 的判断已撤回。tex:936-937 明确公式取在 π̂/V̂ (SPE 基准) 上，原版 `a_hat.std()` 是 paper-correct。BUG #8 改方向是错的，已经在 `lib/io.py` + `scripts/reaggregate_paper_std.py` 里回滚到 `a_hat.std()` / `v_hat.std()`。
+
+正确的修法是 **per-seed rebuild SPE oracle**（在 `barberis_spe.compute_spe_policy` 加 `seed=` 参数 + `run_paper_eval.py` 把 oracle build 移进 seed loop），让 σ_seeds[π̂(x)] 在小 action-gap state 上有跨 seed flip → 非零。验证：M=2000 + 10 seeds 在 CPT88/0.66 上 state (2,0) 真的会 flip (action 0/1)。
+
+详见 [reports/2026-04-28_tex_source_cross_check.md](2026-04-28_tex_source_cross_check.md) §"严重度 1"。
+
+下方原文保留作为修复历史记录。
+
+## ⚠️ Aggregator bug 修正 (BUG #7, 2026-04-28 后续) — σ 部分 retracted
 
 **Paper §4.1 (p.23) 的 PE / VE 公式**:
 

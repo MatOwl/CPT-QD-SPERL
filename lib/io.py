@@ -120,14 +120,17 @@ def save_aggregate(root, all_metrics: list[dict]):
         (a) systematically over-estimates the paper formula. Use (b) when
         comparing to paper Tables 3/4 numbers directly.
 
-        The paper-style stdev is (1/|X|) sum_x sigma_seeds[π̃(x)] / sigma_seeds[V_tilde(x)],
-        i.e. per-state seed-stdev of the LEARNED policy/value (π̃, Ṽ),
-        NOT the reference oracle (π̂, V̂) which is deterministic-up-to-CRN-noise
-        across seeds. An earlier version of this aggregator took σ on (a_hat,
-        v_hat) which under the rebuilt-once + CRN setup gave near-zero std,
-        wildly off paper Tables 3/4 (paper σ_PE ≈ 0.13, σ_VE ≈ 0.95 for the
-        CPT88/0.66 cell). Switching to (a_tilde, v_tilde) yields per-state σ
-        that averages to the paper-aligned scale.
+        Paper §4.1 (tex:936-937) defines the σ side as
+            σ_PE = (1/|X|) Σ_x σ_seeds[π̂(x)]
+            σ_VE = (1/|X|) Σ_x σ_seeds[V^π̂(x)]
+        i.e. σ on the SPE oracle (π̂, V̂), NOT the learned (π̃, Ṽ). To populate
+        these σ terms with non-zero values, ``run_paper_eval.py`` rebuilds the
+        SPE oracle per seed (different MC-rollout RNG → different π̂, V̂).
+        The 2026-04-28 ``BUG #8 fix`` that flipped to (a_tilde, v_tilde) was a
+        retracted misreading: it was a workaround for the cached-once oracle
+        producing σ_hat ≈ 0, but it changes the formula's semantics. We have
+        reverted it here and addressed the σ_hat ≈ 0 issue at the oracle build
+        site instead.
     """
     keys = [
         "policy_disagree_total",
@@ -158,7 +161,8 @@ def save_aggregate(root, all_metrics: list[dict]):
         w = csv.writer(f)
         w.writerow(["metric", "mean", "std", "n"])
         for k, v in agg.items():
-            w.writerow([k, v["mean"], v["std"], v["n"]])
+            n = v.get("n", v.get("n_states"))
+            w.writerow([k, v["mean"], v["std"], n])
 
     return agg
 
@@ -205,11 +209,11 @@ def _aggregate_paper_formula(all_metrics: list[dict]) -> dict | None:
         v_hat = np.asarray(d["v_hat"], dtype=np.float64)
         pe_mean_terms.append(abs(a_tilde.mean() - a_hat.mean()))
         ve_mean_terms.append(abs(v_tilde.mean() - v_hat.mean()))
-        # Paper §4.1: σ on the LEARNED side (π̃ / Ṽ) — captures the seed-to-seed
-        # spread of SPERL's per-state output. Using the SPE oracle (π̂ / V̂) gives
-        # ≈0 since the oracle is built once + CRN'd and shouldn't vary across seeds.
-        pe_std_terms.append(a_tilde.std())
-        ve_std_terms.append(v_tilde.std())
+        # Paper §4.1 (tex:936-937): σ on π̂ / V^π̂ (the SPE oracle), not π̃.
+        # Requires per-seed SPE oracle rebuild (see run_paper_eval.py) to be
+        # non-zero; cached-once oracle gives σ ≈ 0.
+        pe_std_terms.append(a_hat.std())
+        ve_std_terms.append(v_hat.std())
     n_x = len(pe_mean_terms)
     if n_x == 0:
         return None

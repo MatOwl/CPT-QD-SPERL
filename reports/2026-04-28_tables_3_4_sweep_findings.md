@@ -3,6 +3,8 @@
 **日期**: 2026-04-28
 **结论**: Refactor 在 §C.4 全 sweep (10 cells × 6 filters × 10 seeds) 上 PE/VE 比 paper 系统性差 2-7×。这是结构性 gap，需要进一步排查 Algorithm 实现细节，而不仅是超参对齐。
 
+> **2026-04-28 末段勘误**: 报告里"§C.4 sweep"实际 tex 位置是 paper 主体 §7.1 (Equilibrium Learning and Approximation, tex:931, label `sec: cptsperl-experiments-filtering`), 不在附录 C。Table 3/4 数据也都在 §7.1 (tex:940-984)。详见 [reports/2026-04-28_tex_source_cross_check.md](2026-04-28_tex_source_cross_check.md) §"严重度 3"。
+
 ---
 
 ## 1. 主要数据

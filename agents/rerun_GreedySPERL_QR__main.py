@@ -28,7 +28,25 @@ if "../" not in sys.path:
     sys.path.append("../")
     
 from lib.envs.barberis_casino import barberisCasino
-from stable_baselines.common.misc_util import set_global_seeds
+
+
+def set_global_seeds(seed):
+    """In-tree replacement for ``stable_baselines.common.misc_util.set_global_seeds``
+    which the original 2022 script depended on. Seeds Python's ``random``,
+    NumPy and (if importable) TensorFlow — same coverage the SB1 helper
+    provided, minus the now-defunct TF1 path. We've retired the SB1 dependency
+    because pip installing SB1 alongside numpy 1.26 breaks gym 0.26."""
+    import random as _random
+    _random.seed(seed)
+    np.random.seed(seed)
+    try:
+        import tensorflow as _tf
+        try:
+            _tf.random.set_seed(seed)  # TF2
+        except AttributeError:
+            _tf.set_random_seed(seed)  # TF1
+    except ImportError:
+        pass
 
 def barberisFeaturize(obs):
     t, z = obs
@@ -1046,21 +1064,40 @@ class QPG_CPT():
         return self
 
 #################################### RUNNER ###################################
-#CPTParams = list(itertools.product(np.round(np.linspace(1, .95, 2), 4), np.round(np.linspace(1, .65+.05, 4), 4), np.round(np.linspace(1, 1.4, 3), 4)))
-#CPTParams = [(.95, .5, 1.5), (.88, .65, 2.25)]
+# 2026-04-28: parameterized via env vars so a sweep driver can iterate over
+# (alpha, rho1, lmbd, p_win, p_filter, treshRatio, eps, n_batch, train_num,
+# seed_lo, seed_hi, lbub, ss_inverted) without editing this file. Defaults
+# preserve the legacy verification-cell config (CPT88/p=0.66/filter=0.9 from
+# HANDOFF row 14, ε=0.6, batch=1, M=30k).
 
-lbub = 1
+def _envf(name, default):
+    return float(os.environ.get(name, default))
 
-# K = 50
-#2I. reset CPTParams
-CPTParams = [(.95, .5, 1.5)] #[(.88, .65, 2.25)] #[(.95, .5, 1.5)]
-pwinArr = [.36, .3, .42] #[.62, .59, .64] # [.36, .3, .42]
+def _envi(name, default):
+    return int(os.environ.get(name, default))
 
-# cpt=.95: .6, .63 wo filter/firstVisit alr decent (prob bias 0)
-# cpt=1. : .63, .66, .72 alr decent
-p_filterArr = [1.]
-treshRatio = np.inf # equal to setting =0 (with MONO) if filter=1.
-ss_inverted = 1
+_CPT_ALPHA = _envf("LEGACY_ALPHA", 0.88)
+_CPT_RHO1 = _envf("LEGACY_RHO1", 0.65)
+_CPT_LMBD = _envf("LEGACY_LMBD", 2.25)
+_PWIN = _envf("LEGACY_PWIN", 0.66)
+_FILTER = _envf("LEGACY_FILTER", 0.9)
+_TRESH = float(os.environ.get("LEGACY_TRESHRATIO", "0.5"))
+_LBUB = _envi("LEGACY_LBUB", 1)
+_FIRST_VISIT = _envi("LEGACY_FIRST_VISIT", 1)
+_SEED_LO = _envi("LEGACY_SEED_LO", 5)
+_SEED_HI = _envi("LEGACY_SEED_HI", 14)  # exclusive
+_EPS = _envf("LEGACY_EPS", 0.6)
+_N_BATCH = _envi("LEGACY_N_BATCH", 1)
+# total trajectory count = train_num * 2 * n_batch * actor_timescale.
+# Default 300*50 = 15000 → with n_batch=1 gives 30000 episodes (legacy native).
+_TRAIN_NUM = _envi("LEGACY_TRAIN_NUM", 300 * 50)
+
+lbub = _LBUB
+CPTParams = [(_CPT_ALPHA, _CPT_RHO1, _CPT_LMBD)]
+pwinArr = [_PWIN]
+p_filterArr = [_FILTER]
+treshRatio = _TRESH if _LBUB == 1 else 0
+ss_inverted = _FIRST_VISIT
 
 '''
 #2II. reset CPTParams, w filters
@@ -1104,7 +1141,7 @@ treshRatio = .5 # .25 (p=.72 spikes but no effect on performance now,
                 # np.inf (only if filter=1.; then, equal to setting =0 (with MONO))
 ss_inverted = 1 # 0: only remove firstVisit, but keep the 2nd one; just want to test treshRatio for V00 fluctuate;
 '''
-seedArr = range(5, 14) #range(5, 14) # COMPLETE RUN: seed 5, for all
+seedArr = range(_SEED_LO, _SEED_HI) #range(5, 14) # COMPLETE RUN: seed 5, for all
 
 for alpha, rho1, lmbd in CPTParams:
     rho2 = rho1
@@ -1256,7 +1293,7 @@ for alpha, rho1, lmbd in CPTParams:
         
         for p_win in pwinArr: # incl [.63, .6] #np.linspace(.69, .63, 4): # p = (.62, .65) breakpoint of 'gamble' at t0;
             p_win = np.round(p_win, 4)    
-            for n_batch in [1]: # (default) [50]:
+            for n_batch in [_N_BATCH]: # (default) [50]:
                 for seed in seedArr:#range(5, 14): #[4]: #range(3, 6): #@p = .7: [18, 0]; @p = .5: [1, 0]; @p = .3: [4, 0]
                     for critic_lr in [2.0]: #[.2, .5]: # (default) [.1]:
                         step_size = 5.0 # 0.0 | 5.0
@@ -1266,7 +1303,7 @@ for alpha, rho1, lmbd in CPTParams:
                         # Ablation Parameters
                         support_size = 50 # check till (3, 30) bias disappears; but ideally need 200.
                         explore_type = 'eps-greedy' # 'softmax'
-                        eps = .6 # default: eps=.3(<1), beta=10(>5)
+                        eps = _EPS # default: eps=.3(<1), beta=10(>5)
                         if lbub == 0:
                             p_filter = 1 #NA
                             treshRatio = 0
@@ -1292,7 +1329,7 @@ for alpha, rho1, lmbd in CPTParams:
                         env = barberisCasino(p = p_win) 
                         
                         actor_timescale = 1
-                        train_num = 300*50 # change default, if n_batch is changed to 1 from 50; @BFS20: use 200*50
+                        train_num = _TRAIN_NUM # change default, if n_batch is changed to 1 from 50; @BFS20: use 200*50
                         n_train_eps = train_num * (2*n_batch) * actor_timescale
                         n_eval_eps = 100   # S2 speedup: 500 -> 100 (5x per-eval); affects monitoring only
                         eval_freq = 2*n_batch *1500 # S1 speedup: factor 50 -> 1500 (15x fewer evals); was 100, now 3000

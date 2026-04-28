@@ -4,6 +4,8 @@
 **数据**: `runs/results_paper_tables_1_2_v3/` (10 cells × 10 seeds, paper §C.2.5 hyperparams + 2026-04-28 6-bug fix)
 **Paper PDF 来源**: `paperRef/MSci_MANUSCRIPT.pdf` p.25 Tables 1 & 2 SPERL 列
 
+> **2026-04-28 末段勘误**: (1) 下方 Table 1 CPT88/p=0.72 paper σ 原写 "1.64"，实际 tex:1066 是 "0.64"，已修。(2) §"hardest convergence" wording 实际在 tex 里是 "worst SPE learning result" (§7.1)。详见 [reports/2026-04-28_tex_source_cross_check.md](2026-04-28_tex_source_cross_check.md)。
+
 ---
 
 ## 修复了什么
@@ -37,7 +39,7 @@ vs v2 (2026-04-27 sweep)：
 
 | Cell | filter | Paper (μ ± σ) | Refactor v3 (μ ± σ) | \|R−P\|/σ_pool | 1σ? |
 |---|---|---|---|---|---|
-| CPT88 / p=0.72 | 0.95 | **7.91 ± 1.64** | 9.47 ± 1.55 | 0.97σ | ✓ |
+| CPT88 / p=0.72 | 0.95 | **7.91 ± 0.64** | 9.47 ± 1.55 | 0.93σ | ✓ |
 | **CPT88 / p=0.66** | **0.90** | **2.74 ± 0.95** | **0.87 ± 2.06** | **1.17σ** | **✗** |
 | CPT88 / p=0.60 | 0.85 | 0.00 ± 0.00 | 0.00 ± 0.00 | 0.00σ | ✓ |
 | CPT88 / p=0.54 | 0.80 | 0.00 ± 0.00 | 0.00 ± 0.00 | 0.00σ | ✓ |

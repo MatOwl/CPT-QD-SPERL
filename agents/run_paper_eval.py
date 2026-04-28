@@ -81,14 +81,17 @@ def build_env(name, args):
     raise ValueError(name)
 
 
-def get_reference_policy(args, env):
+def get_reference_policy(args, env, seed=None):
+    """Build the SPE oracle for the given env. Pass ``seed`` to reseed the
+    oracle's internal MC rollouts so each training seed gets an independent
+    estimate; required for paper §4.1 σ-on-π̂/V̂ to be non-zero."""
     if args.env == "barberis":
         from lib.envs.barberis_spe import compute_spe_policy, spe_policy_fn
         print(f"[ref] solving Barberis SPE via backward induction "
-              f"(n_eval_eps={args.spe_rollouts})")
+              f"(n_eval_eps={args.spe_rollouts}, seed={seed})")
         spe_dict = compute_spe_policy(
             env, CPTParams(args.alpha, args.rho1, args.rho2, args.lmbd),
-            n_eval_eps=args.spe_rollouts,
+            n_eval_eps=args.spe_rollouts, seed=seed,
         )
         return spe_policy_fn(spe_dict)
     if args.env == "optex":
@@ -233,10 +236,6 @@ def main():
 
     cpt = CPTParams(args.alpha, args.rho1, args.rho2, args.lmbd)
 
-    # Reference policy (depends only on env, not seed)
-    ref_env = build_env(args.env, args)
-    reference_pi = get_reference_policy(args, ref_env)
-
     # Persistence setup
     run_root = None
     if not args.no_save:
@@ -244,10 +243,27 @@ def main():
         save_config(run_root, vars(args))
         print(f"[io] writing to {run_root}")
 
+    # SPE oracle is rebuilt per seed for envs whose oracle uses MC rollouts
+    # (barberis/abandonment/bln), so seed-to-seed variation in π̂/V^π̂ populates
+    # paper §4.1's σ_x[π̂(x)] / σ_x[V^π̂(x)] terms. For optex (file-loaded
+    # oracle) per-seed rebuild is a no-op, so we cache it once.
+    optex_ref_pi = None
+    if args.env == "optex":
+        optex_ref_pi = get_reference_policy(args, build_env(args.env, args))
+
     all_metrics = []
     for seed in range(args.seeds):
         print(f"\n=== seed {seed} ===")
         env = build_env(args.env, args)
+        if optex_ref_pi is not None:
+            reference_pi = optex_ref_pi
+        else:
+            ref_env = build_env(args.env, args)
+            # Offset by a large prime so SPE oracle's RNG stream doesn't
+            # accidentally mirror the agent's training RNG at the same seed.
+            reference_pi = get_reference_policy(
+                args, ref_env, seed=seed + 1_000_003,
+            )
         featurizer = make_featurizer(args.env, env)
         agent = GreedySPERL(
             env, featurizer, cpt,

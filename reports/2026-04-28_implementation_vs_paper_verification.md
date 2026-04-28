@@ -3,6 +3,8 @@
 **日期**: 2026-04-28
 **目的**: 系统性核对 refactor 实现的每一步公式 + 参数 vs paper 文字。覆盖 Algorithm 2/3/4/5 + §2.1.4 (CPT) + §C.2.1-5 + Definition 5.
 
+> **2026-04-28 末段勘误**: 本报告里的章节号 §C.2.1 / §C.2.2 / §C.2.3 / §C.2.4 / §C.2.5 都是基于 PDF 估读，实际 tex 位置都在 paper 主体 §6 (Algorithm) 与 §7 (Empirical Study)，**不在附录 C**。具体对应见 [reports/2026-04-28_tex_source_cross_check.md](2026-04-28_tex_source_cross_check.md) §"严重度 3"。算法/超参/公式实质内容都核对过、无误。
+
 ---
 
 ## 总览
