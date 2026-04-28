@@ -102,7 +102,33 @@ def save_seed_result(root, seed: int, agent, metrics: dict):
 
 
 def save_aggregate(root, all_metrics: list[dict]):
-    """Aggregate scalar metrics across seeds; write JSON + CSV."""
+    """Aggregate scalar metrics across seeds; write JSON + CSV.
+
+    Records two flavors of Policy Error / Value Error:
+
+    (a) ``policy_disagree_total`` / ``value_error_total`` (per-seed counts and
+        per-state |diff| sums, averaged across seeds). This is what was used
+        before the 2026-04-28 BUG #7 finding.
+
+    (b) ``policy_error_paper`` / ``value_error_paper`` — Paper §4.1 formula:
+
+            PE = sum_x | mu_seeds[a_tilde(x)] - mu_seeds[a_hat(x)] |
+            VE = sum_x | mu_seeds[V_tilde(x)]  - mu_seeds[V_hat(x)]  |
+
+        i.e. average each side over seeds first, take |diff| afterward.
+        By Jensen / triangle inequality, (b) <= per-seed average of |...|;
+        (a) systematically over-estimates the paper formula. Use (b) when
+        comparing to paper Tables 3/4 numbers directly.
+
+        The paper-style stdev is (1/|X|) sum_x sigma_seeds[π̃(x)] / sigma_seeds[V_tilde(x)],
+        i.e. per-state seed-stdev of the LEARNED policy/value (π̃, Ṽ),
+        NOT the reference oracle (π̂, V̂) which is deterministic-up-to-CRN-noise
+        across seeds. An earlier version of this aggregator took σ on (a_hat,
+        v_hat) which under the rebuilt-once + CRN setup gave near-zero std,
+        wildly off paper Tables 3/4 (paper σ_PE ≈ 0.13, σ_VE ≈ 0.95 for the
+        CPT88/0.66 cell). Switching to (a_tilde, v_tilde) yields per-state σ
+        that averages to the paper-aligned scale.
+    """
     keys = [
         "policy_disagree_total",
         "value_error_total",
@@ -119,6 +145,12 @@ def save_aggregate(root, all_metrics: list[dict]):
                       "std": float(np.std(vals)),
                       "n": len(vals)}
 
+    # Paper §4.1 formula: average per-state across seeds, then |diff|.
+    paper_metrics = _aggregate_paper_formula(all_metrics)
+    if paper_metrics is not None:
+        agg["policy_error_paper"] = paper_metrics["policy_error_paper"]
+        agg["value_error_paper"] = paper_metrics["value_error_paper"]
+
     with open(os.path.join(root, "aggregate.json"), "w") as f:
         json.dump(agg, f, indent=2)
 
@@ -129,6 +161,71 @@ def save_aggregate(root, all_metrics: list[dict]):
             w.writerow([k, v["mean"], v["std"], v["n"]])
 
     return agg
+
+
+def _aggregate_paper_formula(all_metrics: list[dict]) -> dict | None:
+    """Compute paper §4.1 PE/VE from per_state tables across seeds.
+
+    Returns ``None`` if any seed lacks per_state. Each seed's ``per_state`` is
+    a list of {state, a_tilde, a_hat, v_tilde, v_hat}. We join across seeds by
+    ``state`` (str-cast tuple) and apply the paper aggregator per state.
+    """
+    if not all_metrics:
+        return None
+    if not all(m.get("per_state") for m in all_metrics):
+        return None
+
+    # Collect per-state arrays across seeds
+    state_keys = [str(row["state"]) for row in all_metrics[0]["per_state"]]
+    state_data = {s: {"a_tilde": [], "a_hat": [], "v_tilde": [], "v_hat": []}
+                  for s in state_keys}
+    for m in all_metrics:
+        seen = set()
+        for row in m["per_state"]:
+            s = str(row["state"])
+            if s not in state_data:
+                state_data[s] = {"a_tilde": [], "a_hat": [],
+                                 "v_tilde": [], "v_hat": []}
+            state_data[s]["a_tilde"].append(float(row["a_tilde"]))
+            state_data[s]["a_hat"].append(float(row["a_hat"]))
+            state_data[s]["v_tilde"].append(float(row["v_tilde"]))
+            state_data[s]["v_hat"].append(float(row["v_hat"]))
+            seen.add(s)
+
+    pe_mean_terms = []
+    ve_mean_terms = []
+    pe_std_terms = []
+    ve_std_terms = []
+    for s, d in state_data.items():
+        if not d["a_tilde"]:
+            continue
+        a_tilde = np.asarray(d["a_tilde"], dtype=np.float64)
+        a_hat = np.asarray(d["a_hat"], dtype=np.float64)
+        v_tilde = np.asarray(d["v_tilde"], dtype=np.float64)
+        v_hat = np.asarray(d["v_hat"], dtype=np.float64)
+        pe_mean_terms.append(abs(a_tilde.mean() - a_hat.mean()))
+        ve_mean_terms.append(abs(v_tilde.mean() - v_hat.mean()))
+        # Paper §4.1: σ on the LEARNED side (π̃ / Ṽ) — captures the seed-to-seed
+        # spread of SPERL's per-state output. Using the SPE oracle (π̂ / V̂) gives
+        # ≈0 since the oracle is built once + CRN'd and shouldn't vary across seeds.
+        pe_std_terms.append(a_tilde.std())
+        ve_std_terms.append(v_tilde.std())
+    n_x = len(pe_mean_terms)
+    if n_x == 0:
+        return None
+
+    return {
+        "policy_error_paper": {
+            "mean": float(sum(pe_mean_terms)),
+            "std": float(sum(pe_std_terms) / n_x),
+            "n_states": n_x,
+        },
+        "value_error_paper": {
+            "mean": float(sum(ve_mean_terms)),
+            "std": float(sum(ve_std_terms) / n_x),
+            "n_states": n_x,
+        },
+    }
 
 
 def _json_default(o):

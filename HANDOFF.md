@@ -1,6 +1,6 @@
 # 交接文档 — CPT-QD-SPERL paper 复现
 
-**最后更新**: 2026-04-27 (refactor ↔ L-原 native 一致性 ✅；BLN consumption env MVP 实施完成；2026-04-26 之前: LNW abandonment env 实施完成，paper §4 deliverable 全套就位；Phase A+B+C refactor verification 完成在前)
+**最后更新**: 2026-04-28 (paper §C line-by-line verification + 6+1+4 个 bug/差异 修。新增 BUG #8: paper §4.1 σ 公式取错；NE-1/3/4/6: refactor `GreedyPolicy` init/sticky/tie-break/t=T-broadcast 对齐 legacy。结果：refactor + legacy production hp (ε=0.6, batch=1, M=30k) 在 CPT88/p=0.66/filter=0.9 上 Opt 3.03 vs paper 2.74 (0.10σ), SW -59.80 vs -59.94 (0.02σ); Tables 1/2 完全闭合，Tables 3/4 PE/VE 仍有 ~30% 残余（小 action-gap state 上的 deadlock）。2026-04-27: refactor ↔ L-原 native 一致性 ✅；BLN consumption env MVP 实施完成；2026-04-26 之前: LNW abandonment env 实施完成，paper §4 deliverable 全套就位；Phase A+B+C refactor verification 完成在前)
 
 任务: 验证 refactor 后的 generic SPERL 是否和 paper (`paperRef/MSci_MANUSCRIPT.pdf`) 对得上。
 
@@ -11,14 +11,14 @@
 | Refactor 引入的 3 个语义 bug | ✅ 已修 (cpt_offset hook + featurizer/SPE 修补) |
 | Refactor pure-fn 一致性 (Phase A unit isolation) | ✅ compute_CPT 100% ≡ legacy；filter ⚠️ paper-pseudocode-faithful（legacy 偏离 paper 文字）；env ✓ |
 | Refactor critic update 一致性 (Phase B unit isolation) | ✅ first-visit ≡；QR grad ≡ legacy 用向量化版后 bit-exact；当前 generic 比 legacy fp 更精确 |
-| Refactor e2e 一致性 (Phase C 10-seed legacy aggregate) | ✅ L-原 native 重测 (CPT88/p=0.66/filter=0.9): 4 metric 全在 0.5σ 内 (Opt 0.45±2.63 vs 1.46±1.71). [reports/2026-04-27_refactor_vs_legacy_p066.md](reports/2026-04-27_refactor_vs_legacy_p066.md) |
+| Refactor e2e 一致性 (Phase C 10-seed legacy aggregate) | ✅ L-原 native 重测 (CPT88/p=0.66/filter=0.9, treshRatio=0.5, gate=relative): refactor v3 = −0.19±2.31, legacy = 0.45±2.63 (0.26σ pooled). [reports/2026-04-27_refactor_vs_legacy_p066.md](reports/2026-04-27_refactor_vs_legacy_p066.md). 注意 2026-04-28 后 refactor default `--filter-gate-mode` 改成 `absolute` (paper 文字)；要复现 0.26σ 这个对照需显式 `--filter-gate-mode relative` |
 | Paper Tables 数字源于 legacy？| ❌ legacy 自己都跑不出 paper 2.74，paper 用的不是这份代码 |
 | Welfare 求和域 vs paper Definition 5 | ✅ 已对齐 (Barberis featurizer fix) |
 | Algorithm 3/4 port 到 generic path | ✅ 完成，默认 off, 向后兼容 |
 | Barberis Optimality + SW (CPT88/p=0.72, 0.66) | ✅ 对齐 paper 1σ |
 | OptEx on-path SPERL vs SPE | ✅ 几乎完美匹配 (0 stable_mismatch on-path) |
 | README CLI 示例 + Alg 3/4 flags 文档 | ✅ 已 sync |
-| Alg 3/4 在 p=0.66 上 partial 对齐 (10 seeds 后) | ⚠️ 最佳 sticky+filter=0.9+accept=∞: 1.46±1.71 vs paper 2.74±0.95 (1.3σ 差距) |
+| Alg 3/4 在 p=0.66 上 partial 对齐 (10 seeds 后) | ⚠️ v3 (sticky+filter=0.9+treshRatio=0.5, gate=relative): refactor −0.19±2.31 vs paper 2.74±0.95 (1.66σ); 旧 1.46±1.71 是 treshRatio=∞ 跑出来的，已 stale |
 | OptEx 5 个 contested decision points | ⚠️ Alg 3/4 未能解决，需更长 training 或别的 tie-break |
 | ≥10 seeds head-to-head ablation 完成 | ✅ done; 3-seed 数据全部翻案 (见 alg34_paper_diff report) |
 | VE 系统性 2.5× 高于 paper (我们 ~24 vs paper ~9.3) | ❌ 全 ablation 配置都受影响，独立于 Alg 3/4 |
@@ -38,6 +38,7 @@
 | **BLN BFS reachability fix (iter_states bug #5)** | ✅ 240 grid → 20 reachable; 一次 fix 把 SPERL Disagree 从 80% 降到 30% |
 | BLN Phase 5 deliverables (grid / DO / heatmap / convergence / Alg34) | ❌ 未做 (MVP scope 不含, 视后续展开) |
 | BLN salary / portfolio decision extension | ❌ MVP 不含 (paper §4 时声明 future work) |
+| **Paper §C line-by-line verification + 6 bug 修 (2026-04-28)** | ✅ 见 [reports/2026-04-28_implementation_vs_paper_verification.md](reports/2026-04-28_implementation_vs_paper_verification.md) "Addendum"。F1 (filter pre-sort 死代码), F2 (CLI default 不是 paper-aligned), F3 (SPE oracle 非 parity 多迭代), F4 (paper_eval 无 CRN), F5/F6 (doc 错). **runs/results_paper_tables_*_v2/ 是修复前数据，需重跑 sweep** |
 
 ## 关键概念
 
@@ -117,3 +118,6 @@ Packages: numpy==1.26.3 (gym 0.26 硬要求 <2), scipy, pandas, matplotlib, gym=
 | 2026-04-27 | BLN consumption env MVP (3rd env, endogenous reference + ternary action; iter_states bug #5) | [reports/2026-04-27_bln_env_mvp.md](reports/2026-04-27_bln_env_mvp.md) |
 | 2026-04-27 | Refactor ↔ L-原 native 一致性确认 (CPT88/p=0.66/filter=0.9, 10 seeds, 0.5σ 内) | [reports/2026-04-27_refactor_vs_legacy_p066.md](reports/2026-04-27_refactor_vs_legacy_p066.md) |
 | 2026-04-27 (rev 04-28) | Paper Tables 1/2 全 10 cells SPERL 复现 (refactor, 10 seeds, per-cell filter): Opt 9/10, SW 6/10 在 1σ 内. v1 paper 数字 hardcode 错误已修正 | [reports/2026-04-27_paper_tables_1_2_full_sweep.md](reports/2026-04-27_paper_tables_1_2_full_sweep.md) |
+| 2026-04-28 | Implementation ↔ Paper §C line-by-line verification + Tables 3/4 全 60 cells sweep | [reports/2026-04-28_implementation_vs_paper_verification.md](reports/2026-04-28_implementation_vs_paper_verification.md) + [reports/2026-04-28_tables_3_4_sweep_findings.md](reports/2026-04-28_tables_3_4_sweep_findings.md) |
+| 2026-04-28 | 挑战 04-28 v1 verification 报告 + 6 个新 bug 修 (filter pre-sort 死代码、CLI defaults 非 paper、SPE 非 parity、paper_eval 无 CRN、doc 错) | [reports/2026-04-28_implementation_vs_paper_verification.md](reports/2026-04-28_implementation_vs_paper_verification.md) "Addendum" 节 |
+| 2026-04-28 | BUG #8: paper §4.1 σ 公式取错 (`a_hat.std()` 应是 `a_tilde.std()`)。修后 60 cells Tables 3/4 σ 落入 paper 量级 (PE 0.11-0.34 vs paper 0.02-0.30; VE 0.48-1.00 vs paper 0.20-1.30)。无需重训练，`scripts/reaggregate_paper_std.py` 直接重算 | [scripts/reaggregate_paper_std.py](scripts/reaggregate_paper_std.py) + `lib/io.py:_aggregate_paper_formula` |

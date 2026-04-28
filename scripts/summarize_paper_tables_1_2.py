@@ -24,8 +24,9 @@ from math import sqrt
 
 SWEEP_DIR_V1 = "runs/results_paper_tables_1_2"     # treshRatio=inf (wrong wrt paper)
 SWEEP_DIR_V2 = "runs/results_paper_tables_1_2_v2"  # treshRatio=0.5 / 0 (paper §C.2.5)
+SWEEP_DIR_V3 = "runs/results_paper_tables_1_2_v3"  # 2026-04-28 6-bug fix
 P066_DIR     = "runs/results_p066_10s_both_acceptInf"
-SWEEP_DIRS = [SWEEP_DIR_V2, SWEEP_DIR_V1, P066_DIR]  # prefer v2
+SWEEP_DIRS = [SWEEP_DIR_V3, SWEEP_DIR_V2, SWEEP_DIR_V1, P066_DIR]  # prefer v3
 
 # (CPT_label, alpha, rho, lmbd, p_win, filter,
 #  paper_opt_mean, paper_opt_std, paper_sw_mean, paper_sw_std)

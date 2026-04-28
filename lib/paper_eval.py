@@ -34,6 +34,7 @@ def rollout_cpt_from_state(
     cpt_params: CPTParams,
     reset_kwargs_for_state: Callable | None = None,
     initial_offset_for_state: Callable | None = None,
+    seed: int | None = None,
 ):
     """Run ``n_eps`` episodes starting from ``init_state`` under ``policy_fn``
     and return the CPT of total rewards.
@@ -46,28 +47,45 @@ def rollout_cpt_from_state(
     offset to each trajectory's summed reward before CPT evaluation. Required
     when the MDP reward is an *increment* relative to the state's embedded
     position (Barberis: wealth z), so that CPT is computed on terminal wealth
-    (z + Σr) rather than on the change from z.  Defaults to 0 for envs whose
-    Σr is already the CPT-relevant quantity (e.g. OptEx revenue).
+    (z + sum(r)) rather than on the change from z. Defaults to 0 for envs
+    whose sum(r) is already the CPT-relevant quantity (e.g. OptEx revenue).
+
+    ``seed``: when provided, np.random is reseeded before the rollout loop
+    and restored afterwards. Used by ``compute_paper_metrics`` to give two
+    policies the SAME stochastic stream (common random numbers / CRN) per
+    state x, so |V_tilde(x) - V_hat(x)| reflects only policy difference,
+    not independent env-step noise. Without CRN, identical policies still
+    produce |V_tilde - V_hat| ~ sqrt(var/n_eps) per state and inflate the
+    Value Error sum across states.
     """
     rewards = []
     offset = 0.0
     if initial_offset_for_state is not None:
         offset = float(initial_offset_for_state(init_state))
-    for _ in range(n_eps):
-        if reset_kwargs_for_state is not None:
-            state = env.reset(**reset_kwargs_for_state(init_state))
-        else:
-            state = env.reset()
-        t = _state_time(init_state, env)
-        total = 0.0
-        for _ in itertools.count():
-            a = int(policy_fn(t, state))
-            state, r, done, _ = env.step(a)
-            total += r
-            t += 1
-            if done:
-                break
-        rewards.append(total + offset)
+
+    saved_state = None
+    if seed is not None:
+        saved_state = np.random.get_state()
+        np.random.seed(seed)
+    try:
+        for _ in range(n_eps):
+            if reset_kwargs_for_state is not None:
+                state = env.reset(**reset_kwargs_for_state(init_state))
+            else:
+                state = env.reset()
+            t = _state_time(init_state, env)
+            total = 0.0
+            for _ in itertools.count():
+                a = int(policy_fn(t, state))
+                state, r, done, _ = env.step(a)
+                total += r
+                t += 1
+                if done:
+                    break
+            rewards.append(total + offset)
+    finally:
+        if saved_state is not None:
+            np.random.set_state(saved_state)
     return cpt_params.compute(list(rewards))
 
 
@@ -246,13 +264,20 @@ def compute_paper_metrics(
         a_tilde = int(np.argmax(probs_tilde))
         a_hat = int(reference_pi(_state_time(x, env), _to_obs(x, env)))
 
+        # Common random numbers: same per-state seed for both rollouts so
+        # that |v_tilde - v_hat| measures policy difference only, not the
+        # independent env-stochasticity gap that inflated Value Error in
+        # the 2026-04-28 sweep findings (BUG #6 fix).
+        state_seed = abs(hash(tuple(int(v) for v in x))) & 0x7FFFFFFF
         v_tilde = rollout_cpt_from_state(
             env, learned_pi, x, n_eps_per_state, cpt_params,
             reset_kwargs_for_state, initial_offset_for_state,
+            seed=state_seed,
         )
         v_hat = rollout_cpt_from_state(
             env, reference_pi, x, n_eps_per_state, cpt_params,
             reset_kwargs_for_state, initial_offset_for_state,
+            seed=state_seed,
         )
 
         per_state.append({

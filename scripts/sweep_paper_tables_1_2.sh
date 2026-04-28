@@ -5,6 +5,11 @@
 # Other hyperparams match runs/results_p066_10s_both_acceptInf/config.json + paper §C.2.5.
 #
 # v2 (2026-04-28): added per-cell treshRatio per paper §C.2.5 (was inf in v1).
+# v3 (2026-04-28): inherits new run_paper_eval defaults — filter_gate_mode=
+#   "absolute" (paper text), spe_rollouts=2000 (paper Algorithm 5 M=2000).
+#   The v2 cached results in runs/results_paper_tables_1_2_v2/ used the old
+#   "relative" gate + spe_rollouts=300; re-run this script to refresh with
+#   paper-correct semantics.
 #
 # Usage:
 #   bash scripts/sweep_paper_tables_1_2.sh
@@ -14,7 +19,7 @@
 set -e
 
 PYTHON="/c/Users/Jingxiang Tang/FNN/Scripts/python.exe"
-RESULTS_DIR="./runs/results_paper_tables_1_2_v2"
+RESULTS_DIR="./runs/results_paper_tables_1_2_v3"
 
 # Paper §C.2.5 hyperparams
 SEEDS=10
@@ -24,7 +29,7 @@ SUPPORT=50             # K = 50
 CRITIC_LR=0.04         # ϱ = .04
 EXPLORE_EPS=0.3        # ξ = .3
 HORIZON=5              # T̄ = T+1 = 6, so T = 5
-SPE_ROLLOUTS=300
+SPE_ROLLOUTS=2000  # paper Algorithm 5 M = 2000 (was 300; bumped 2026-04-28)
 EVAL_PER_STATE=100
 
 run_cell() {

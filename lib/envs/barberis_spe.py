@@ -30,8 +30,14 @@ def compute_spe_policy(env, cpt_params: CPTParams, n_eval_eps=500, rng=None):
         t, z = int(state[0]), int(state[1])
         return policy.get((t, z), 0)  # default to exit for t not yet set
 
+    # Iterate parity-correct (t, z) only: z must share parity with t since each
+    # gamble step shifts wealth by +/-bet. Matches the legacy
+    # ``rerun_GreedySPERL_QR__main.py:912`` ``np.linspace(-bet*t, bet*t, t+1)``
+    # enumeration. The previous ``range(-t, t+1)`` enumerated 2t+1 values
+    # including parity-violating ones — extra wasted rollouts that never get
+    # queried by parity-correct trajectories.
     for t in range(T, -1, -1):
-        for k in range(-t, t + 1):
+        for k in range(-t, t + 1, 2):
             z = k * bet
             q_vals = []
             for a in range(env.action_space.n):

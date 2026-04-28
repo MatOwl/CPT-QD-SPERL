@@ -126,12 +126,18 @@ def main():
     parser.add_argument("--env", choices=REGISTERED_ENVS, default="barberis")
     parser.add_argument("--seeds", type=int, default=3)
 
-    # training
-    parser.add_argument("--train-eps", type=int, default=2000)
-    parser.add_argument("--batch", type=int, default=10)
-    parser.add_argument("--support-size", type=int, default=20)
-    parser.add_argument("--critic-lr", type=float, default=0.1)
-    parser.add_argument("--eps", type=float, default=0.3)
+    # training -- defaults match paper Section C.2.5 (M=15000, K=50, rho=.04, xi=.3)
+    parser.add_argument("--train-eps", type=int, default=15000,
+                        help="paper C.2.5: M = 15000")
+    parser.add_argument("--batch", type=int, default=5,
+                        help="paper C.2.5 doesn't list n_batch; we use 5"
+                             " (matches legacy verification cell)")
+    parser.add_argument("--support-size", type=int, default=50,
+                        help="paper C.2.5: K = 50")
+    parser.add_argument("--critic-lr", type=float, default=0.04,
+                        help="paper C.2.5: rho = .04")
+    parser.add_argument("--eps", type=float, default=0.3,
+                        help="paper C.2.5: xi = .3")
 
     # CPT
     parser.add_argument("--alpha", type=float, default=0.95)
@@ -166,7 +172,7 @@ def main():
     parser.add_argument("--gamma", type=float, default=0.3,
                         help="[bln] reference EWMA persistence (0=constant)")
     parser.add_argument("--delta-c", type=float, default=0.25,
-                        help="[bln] consumption Δ per step (c=R*(1+aΔ))")
+                        help="[bln] consumption delta per step (c=R*(1+a*delta_c))")
     parser.add_argument("--pi-fixed", type=float, default=0.5,
                         help="[bln] fixed risky-asset fraction (no decision)")
     parser.add_argument("--mu-stock", type=float, default=0.05,
@@ -182,29 +188,38 @@ def main():
     # eval
     parser.add_argument("--eval-per-state", type=int, default=100,
                         help="# rollouts per state for V^pi(x)")
-    parser.add_argument("--spe-rollouts", type=int, default=300,
-                        help="# rollouts per (s,a) for backward-induction SPE"
-                             " (barberis only)")
+    parser.add_argument("--spe-rollouts", type=int, default=2000,
+                        help="paper Algorithm 5: M = 2000 rollouts per (s,a)"
+                             " for backward-induction SPE oracle.")
     parser.add_argument("--spe-file", type=str, default=None,
                         help="path to SPE_OptEx_*.npy (optex only)")
 
-    # paper Alg 3 — consistent tie-break / is-better guard
-    parser.add_argument("--sticky-policy", action="store_true",
-                        help="Alg 3: only update policy when new argmax"
-                             " strictly beats old at this state (paper §C.2).")
+    # paper Alg 3 -- consistent tie-break / is-better guard
+    parser.add_argument("--sticky-policy", action=argparse.BooleanOptionalAction,
+                        default=True,
+                        help="Alg 3 (paper C.2.2 default): only update policy"
+                             " when new argmax STRICTLY beats old. Pass"
+                             " --no-sticky-policy to disable.")
     parser.add_argument("--tie-thresh", type=float, default=0.0,
                         help="Randomize tie-break within tie-thresh of max"
                              " CPT. Default 0 = exact ties only.")
 
-    # paper Alg 4 — quantile filter
+    # paper Alg 4 -- quantile filter
     parser.add_argument("--filter-thresh", type=float, default=None,
                         help="Alg 4: gap-quantile threshold (filterTresh),"
-                             " e.g. 0.75. None disables filtering.")
+                             " e.g. 0.75. None disables filtering. Per-cell"
+                             " Pareto-optimal values from paper C.4 Tables 3/4.")
     parser.add_argument("--filter-accept-ratio", type=float,
-                        default=float("inf"),
-                        help="Alg 4: max relative CPT deviation to accept"
-                             " filtered quantiles (treshRatio). Default inf"
-                             " = trust filter unconditionally.")
+                        default=0.5,
+                        help="Alg 4 line 20: treshRatio. Paper C.2.5"
+                             " default = 0.5 when filter<1, else 0. Pass inf"
+                             " to disable the gate (legacy 'trust filter').")
+    parser.add_argument("--filter-gate-mode", choices=["relative", "absolute"],
+                        default="absolute",
+                        help="Alg 4 line 20 gate semantics. Paper text reads"
+                             " |Q_filt - Q| > treshRatio (absolute) -- the"
+                             " refactor default. 'relative' matches legacy"
+                             " rerun_GreedySPERL_QR__main.py (|dQ|/|Q|).")
 
     # persistence
     parser.add_argument("--results-dir", type=str, default="./runs",
@@ -243,6 +258,7 @@ def main():
             tie_thresh=args.tie_thresh,
             filter_thresh=args.filter_thresh,
             filter_accept_ratio=args.filter_accept_ratio,
+            filter_gate_mode=args.filter_gate_mode,
         )
         agent.learn(
             n_train_eps=args.train_eps, n_batch=args.batch,

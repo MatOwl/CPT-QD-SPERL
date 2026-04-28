@@ -39,12 +39,16 @@ run_cell() {
     fi
 
     echo "===== T=$T  p=$p  $regime  x1=$x1 ====="
+    # Historical baseline: no sticky, no filter, legacy filter gate. Locking
+    # in the original defaults so the grid is reproducible after the
+    # 2026-04-28 paper-align refactor changed defaults.
     "$PYTHON" agents/run_paper_eval.py --env abandonment \
         --seeds $SEEDS --horizon $T --x1 $x1 --c 11 --delta 10 \
         --p-win $p --alpha $alpha --rho1 $rho1 --rho2 $rho2 --lmbd $lmbd \
         --train-eps $EPS --batch $BATCH --support-size $SUPPORT \
         --critic-lr $CRITIC_LR --eps $EXPLORE_EPS \
         --spe-rollouts $SPE_ROLLOUTS --eval-per-state $EVAL_PER_STATE \
+        --no-sticky-policy --filter-gate-mode relative --filter-accept-ratio inf \
         2>&1 | grep -E "(\[seed |Aggregate|Policy Error|Value Error|Optimality|Social Welfare|SPE Welfare)" \
              | grep -v "Gym\|Please\|Users\|See"
     echo

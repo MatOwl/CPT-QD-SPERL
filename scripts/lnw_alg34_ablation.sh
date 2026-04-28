@@ -58,9 +58,9 @@ run_ablation_set() {
     local label=$1
     shift
     local args=("$@")
-    run_cell "$label baseline (no sticky, no filter)"           "${args[@]}"
+    run_cell "$label baseline (no sticky, no filter)"           "${args[@]}" --no-sticky-policy
     run_cell "$label sticky-only"                                "${args[@]}" --sticky-policy
-    run_cell "$label filter=0.9 only"                            "${args[@]}" --filter-thresh 0.9
+    run_cell "$label filter=0.9 only"                            "${args[@]}" --filter-thresh 0.9 --no-sticky-policy
     run_cell "$label sticky + filter=0.9"                        "${args[@]}" --sticky-policy --filter-thresh 0.9
     run_cell "$label sticky + filter=0.75"                       "${args[@]}" --sticky-policy --filter-thresh 0.75
 }

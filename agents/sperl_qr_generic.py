@@ -54,8 +54,12 @@ def filter_quantiles(q, p_filter: float = 0.75) -> np.ndarray:
     # "higher" interpolation matches legacy's np.quantile(..., interpolation='higher')
     d_star = np.quantile(gaps, p_filter, method="higher")
 
-    # valid_gap[k] applies to q[k+1] (the quantile that gap k leads into)
-    valid_gap = (gaps >= -1e-9) & (gaps <= d_star + 1e-6)
+    # Paper Algorithm 4 line 6: bool_j = 1{0 ≤ d_j ≤ d*}. Negative gaps mark
+    # crossing quantiles (paper §C.2.3, "Crossing quantiles" paragraph) and
+    # MUST be invalidated so the snap-to-neighbour branch fires. Tolerance
+    # 1e-6 matches legacy `rerun_GreedySPERL_QR__main.py:1151-1152` for fp
+    # noise; tighter than that (e.g. 1e-9) hid genuine crossings in legacy.
+    valid_gap = (gaps >= -1e-6) & (gaps <= d_star + 1e-6)
 
     valid = np.empty(I, dtype=bool)
     valid[0] = valid_gap[0]  # tie first to second (legacy line 1158-1161)
@@ -125,7 +129,8 @@ class QRCritic:
                  param_init=0.0, cpt_params: CPTParams | None = None,
                  clip_bounds: tuple[float, float] | None = None,
                  filter_thresh: float | None = None,
-                 filter_accept_ratio: float = float("inf")):
+                 filter_accept_ratio: float = float("inf"),
+                 filter_gate_mode: str = "relative"):
         """``clip_bounds=(lo, hi)`` enables the legacy CumSPERL lbub filter:
         after each per-slice update the quantile row is clipped to
         ``[lo, hi]``. Leave ``None`` for pure QR (current default). Useful
@@ -136,9 +141,14 @@ class QRCritic:
         disables filtering entirely; a float in ``[0.5, 1.0]`` is used as the
         gap-quantile threshold (paper: ``filterTresh=0.75``). When enabled,
         each CPT evaluation computes both filtered and unfiltered values;
-        the filtered one is used unless its relative deviation from the
-        unfiltered one exceeds ``filter_accept_ratio`` (paper: ``0.5``).
-        Default ``filter_accept_ratio=inf`` trusts the filter unconditionally.
+        the filtered one is used unless the gate (per ``filter_gate_mode``)
+        rejects it. Paper §C.2.5: ``filter_accept_ratio=0.5``.
+
+        ``filter_gate_mode`` selects gate semantics:
+          - ``"relative"`` (default, matches legacy code): reject filter if
+            ``|v_filt - v_ori| / |v_ori| > filter_accept_ratio``.
+          - ``"absolute"`` (paper Algorithm 4 line 20 text): reject filter if
+            ``|v_filt - v_ori| > filter_accept_ratio``.
         """
         self.featurizer = featurizer
         self.n_actions = n_actions
@@ -148,6 +158,9 @@ class QRCritic:
         self.clip_bounds = clip_bounds
         self.filter_thresh = filter_thresh
         self.filter_accept_ratio = float(filter_accept_ratio)
+        if filter_gate_mode not in ("relative", "absolute"):
+            raise ValueError(f"filter_gate_mode must be 'relative' or 'absolute', got {filter_gate_mode!r}")
+        self.filter_gate_mode = filter_gate_mode
 
         shape = (featurizer.n_states, n_actions, support_size)
         self.qtile_theta = np.full(shape, param_init, dtype=np.float64)
@@ -165,19 +178,27 @@ class QRCritic:
     def _cpt_from_quantiles(self, q_arr: np.ndarray) -> float:
         """Apply Alg 4 filter + acceptance gate, then compute CPT.
 
-        ``q_arr`` is a (I,) array of quantile estimates. If filtering is
-        disabled (``filter_thresh is None``), returns plain CPT on the sorted
-        quantiles — identical to pre-Alg4 behaviour.
+        ``q_arr`` is a (I,) array of quantile estimates. Paper §C.2.3 lists
+        two motivations for Algorithm 4 — discrete return distributions AND
+        crossing quantiles. The crossing-quantile detection (``d_j < 0`` in
+        Algorithm 4 line 6) requires the RAW quantile order; pre-sorting
+        would hide all crossings and silently disable that branch. We pass
+        ``q_arr`` through as-is and let ``compute_CPT(sort=True)`` handle
+        ordering for the CPT integral itself (which is order-invariant).
         """
-        q_sorted = np.sort(q_arr)
-        v_ori = self.cpt_params.compute(list(q_sorted), sort=False)
+        v_ori = self.cpt_params.compute(list(q_arr), sort=True)
         if self.filter_thresh is None:
             return v_ori
-        q_filt = filter_quantiles(q_sorted, p_filter=self.filter_thresh)
-        v_filt = self.cpt_params.compute(list(q_filt), sort=False)
+        q_filt = filter_quantiles(q_arr, p_filter=self.filter_thresh)
+        v_filt = self.cpt_params.compute(list(q_filt), sort=True)
         # Acceptance gate: fall back to unfiltered if filter moved CPT too much.
-        if v_ori == 0.0 or abs((v_filt - v_ori) / v_ori) > self.filter_accept_ratio:
-            return v_ori
+        if self.filter_gate_mode == "absolute":
+            # Paper Algorithm 4 line 20: |v_filt - v_ori| > treshRatio
+            if abs(v_filt - v_ori) > self.filter_accept_ratio:
+                return v_ori
+        else:  # relative (legacy/refactor default)
+            if v_ori == 0.0 or abs((v_filt - v_ori) / v_ori) > self.filter_accept_ratio:
+                return v_ori
         return v_filt
 
     def cpt_value(self, obs, action):
@@ -233,30 +254,41 @@ class QRCritic:
 class GreedyPolicy:
     """Greedy policy driven directly by the critic's CPT-over-quantiles.
 
-    When ``sticky=True`` at update time (paper Algorithm 3), the policy only
-    flips if the proposed argmax *strictly* improves the CPT at the previous
-    action — this addresses non-unique SPEs and prevents argmax thrashing in
-    flat CPT regions. Ties within ``tie_thresh`` of the max are broken
-    uniformly at random via ``rng``.
+    Legacy-aligned semantics (matches `rerun_GreedySPERL_QR__main.py`):
+      * Initial commitment at every state: action ``init_action`` (default 0,
+        which is "exit" in Barberis). Legacy's ``_get_theta`` initialiser
+        does the same — with all qtiles=0, ``argmax([0,0]) = 0`` for every
+        state — so before any visit, the policy is uniformly committed to
+        action 0. Refactor's earlier ``-1 = uncommitted -> uniform`` branch
+        is removed since it changed first-visit dynamics: legacy "stays at
+        exit until evidence drives CPT(gamble) > CPT(exit) strictly", and
+        the refactor variant "commits randomly on first-visit tie", which
+        broke that bootstrap cascade.
+      * Tie-break: ``np.argmax`` (deterministic first-index). Legacy uses
+        ``np.argmax`` everywhere. Pass ``tie_thresh > 0`` together with an
+        ``rng`` to opt into approximate-tie randomization.
+      * Sticky update: strict-improve only (paper Algorithm 3 + legacy
+        line 765-768). The "first-visit unconditional commit" branch is
+        removed — with ``init_action=0`` ``prev_a`` is never -1.
     """
 
-    def __init__(self, featurizer, n_actions, exploration=None):
+    def __init__(self, featurizer, n_actions, exploration=None,
+                 init_action: int = 0):
         self.featurizer = featurizer
         self.n_actions = n_actions
         exploration = exploration or {"type": "eps-greedy", "params": [0.1]}
         self.explore_type = exploration["type"]
         self.explore_param = exploration["params"][0]
 
-        # Per-state greedy action index. -1 = undecided -> uniform.
-        self.greedy_action = -np.ones(featurizer.n_states, dtype=np.int64)
+        # Legacy-aligned: every state starts committed to ``init_action``
+        # (0 = exit in Barberis), matching `policy._get_theta`'s initial
+        # ``theta[loc, argmax([0,0])=0] = 1`` pattern.
+        self.greedy_action = np.full(featurizer.n_states, int(init_action),
+                                     dtype=np.int64)
 
     def predict(self, obs, deterministic=False):
         loc = self.featurizer.loc(obs)
-        a_star = self.greedy_action[loc]
-
-        if a_star < 0:
-            # Uniform until critic produces a preference
-            return np.full(self.n_actions, 1.0 / self.n_actions)
+        a_star = int(self.greedy_action[loc])
 
         base = np.zeros(self.n_actions)
         base[a_star] = 1.0
@@ -276,41 +308,37 @@ class GreedyPolicy:
                                   sticky: bool = False,
                                   tie_thresh: float = 0.0,
                                   rng: np.random.Generator | None = None):
-        """Greedy policy update, optionally with paper Algorithm 3 semantics.
+        """Greedy policy update.
 
-        ``sticky=False`` (default, backwards-compatible): plain argmax,
-        overwrites any previous action.
+        ``sticky=False``: plain argmax, overwrites any previous action.
 
-        ``sticky=True``: keep the previous action unless the new argmax is
-        *strictly* better in CPT value. Ties within ``tie_thresh`` of the max
-        are broken uniformly at random (using ``rng`` if provided).
+        ``sticky=True`` (paper Algorithm 3 / legacy line 765-768): keep the
+        previous action unless the new argmax is *strictly* better in CPT
+        value. With the legacy-aligned ``init_action=0`` constructor, every
+        state starts at action 0, so the strict-improve check is the only
+        path to flip — there is no "first-visit unconditional commit" branch.
+
+        Default tie-break is ``np.argmax`` (deterministic first-index, matches
+        legacy). Pass ``tie_thresh > 0`` with an ``rng`` to randomize among
+        approximate-tie candidates instead.
         """
         loc = self.featurizer.loc(obs)
         cpt_values = np.asarray(cpt_values, dtype=np.float64)
 
-        # Candidate set: all actions within tie_thresh of the top CPT.
-        v_max = cpt_values.max()
-        if tie_thresh > 0:
+        if tie_thresh > 0 and rng is not None:
+            v_max = cpt_values.max()
             candidates = np.flatnonzero(cpt_values >= v_max - tie_thresh)
+            new_a = int(rng.choice(candidates)) if candidates.size > 1 \
+                else int(candidates[0])
         else:
-            candidates = np.flatnonzero(cpt_values == v_max)
-
-        if rng is not None and candidates.size > 1:
-            new_a = int(rng.choice(candidates))
-        else:
-            new_a = int(candidates[0])
+            # Legacy default: deterministic ``np.argmax`` (first-index ties).
+            new_a = int(np.argmax(cpt_values))
 
         if sticky:
-            prev_a = self.greedy_action[loc]
-            # First visit: accept the candidate unconditionally.
-            if prev_a < 0:
-                self.greedy_action[loc] = new_a
-                return
-            # Is-better guard: only flip if the proposed argmax's CPT
-            # strictly exceeds the previous policy's CPT at this state.
+            prev_a = int(self.greedy_action[loc])
             if cpt_values[new_a] > cpt_values[prev_a]:
                 self.greedy_action[loc] = new_a
-            # else: keep prev_a (sticky)
+            # else: keep prev_a (strict-improve sticky)
         else:
             self.greedy_action[loc] = new_a
 
@@ -336,7 +364,8 @@ class GreedySPERL:
                  tie_thresh: float = 0.0,
                  # Paper Alg 4 — quantile filter:
                  filter_thresh: float | None = None,
-                 filter_accept_ratio: float = float("inf")):
+                 filter_accept_ratio: float = float("inf"),
+                 filter_gate_mode: str = "relative"):
         self.env = env
         self.featurizer = featurizer
         self.horizon = getattr(env, "horizon", None) or env.T
@@ -358,6 +387,7 @@ class GreedySPERL:
             clip_bounds=critic_clip_bounds,
             filter_thresh=filter_thresh,
             filter_accept_ratio=filter_accept_ratio,
+            filter_gate_mode=filter_gate_mode,
         )
         self.policy = GreedyPolicy(
             featurizer, env.action_space.n, exploration=exploration,
@@ -397,7 +427,18 @@ class GreedySPERL:
 
     # -------- critic training --------
     def _train_critic_TD(self, aggr_episodes):
-        """Greedy-SPERL TD targets: r + gamma * opponent-action quantiles."""
+        """Greedy-SPERL TD targets: r + gamma * opponent-action quantiles.
+
+        Legacy-aligned: at the terminal step ``t == self.horizon`` (=T) we
+        update qtile for ALL actions with the same target, mirroring
+        ``rerun_GreedySPERL_QR__main.py:733-740``. Rationale: at terminal,
+        the value is action-independent (reward=0, no further decisions),
+        so visiting one action is enough to fix all of them. Refactor's
+        earlier "only the sampled action" code left unvisited terminal
+        actions at the qtile=0 default which is fine via cpt_offset, but
+        legacy's broadcast version yields a tighter QR sample shape.
+        """
+        n_actions = self.env.action_space.n
         for m in range(self.n_batch):
             for t in self.player_set:
                 tr = aggr_episodes[m][t]
@@ -415,7 +456,11 @@ class GreedySPERL:
                     next_q = self.critic.qtile(next_state, opp_action)
                     targets = [reward + self.gamma * q for q in next_q]
 
-                data = {(loc_s, action): targets}
+                if t == self.horizon:
+                    # Legacy line 733-740: broadcast target to ALL actions at t=T.
+                    data = {(loc_s, a): targets for a in range(n_actions)}
+                else:
+                    data = {(loc_s, action): targets}
                 self.critic.update(data)
 
                 # Policy improvement at this state (paper Alg 3 when sticky=True)
@@ -429,7 +474,11 @@ class GreedySPERL:
 
     def _train_critic_MC(self, aggr_episodes):
         """MC targets: Monte-Carlo accumulated reward from t onward (same for
-        all quantiles — a crude but workable initialisation baseline)."""
+        all quantiles — a crude but workable initialisation baseline).
+
+        Legacy-aligned t=T broadcast like ``_train_critic_TD``.
+        """
+        n_actions = self.env.action_space.n
         for m in range(self.n_batch):
             accum = 0.0
             # compute returns-to-go going backward
@@ -448,7 +497,10 @@ class GreedySPERL:
                 state, action, *_ = tr
                 loc_s = self.featurizer.loc(state)
                 targets = [returns_to_go[t]] * self.critic.I
-                self.critic.update({(loc_s, action): targets})
+                if t == self.horizon:
+                    self.critic.update({(loc_s, a): targets for a in range(n_actions)})
+                else:
+                    self.critic.update({(loc_s, action): targets})
 
                 cpt_vals = self.critic.cpt_values_all_actions(state)
                 self.policy.update_from_critic_values(
